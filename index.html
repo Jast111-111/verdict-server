@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Вердикт — экспертная оценка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  :root{
+    --ink:#14202B; --ink-2:#1E2E3D; --ink-3:#28394A;
+    --paper:#F3F0E6; --paper-2:#EAE5D6;
+    --gold:#C89B3C; --gold-deep:#9C7827; --teal:#3B7A6E; --red:#B24C3C;
+    --line-dark:#3A4B5C; --line-light:#D9D2BE;
+    --text-dark:#1B2430; --muted:#7C8A97; --muted-2:#8B8674;
+    --radius:14px; --shadow:0 8px 24px rgba(20,32,43,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--ink);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+  #app{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:26px 0 18px;border-bottom:1px solid var(--line-dark);margin-bottom:28px;flex-wrap:wrap;gap:14px;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand-mark{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 30% 30%, var(--gold), var(--gold-deep));color:var(--ink);font-family:'Fraunces',serif;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.35);flex-shrink:0;}
+  .brand-text .eyebrow{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:2px;}
+  .brand-text h1{font-family:'Fraunces',serif;font-weight:700;font-size:26px;margin:0;letter-spacing:.01em;color:var(--paper);}
+  .topbar-actions{display:flex;align-items:center;gap:10px;}
+  .conn-dot{display:inline-flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);border:1px solid var(--line-dark);padding:6px 12px;border-radius:20px;}
+  .conn-dot .dot{width:8px;height:8px;border-radius:50%;background:var(--red);}
+  .conn-dot.online .dot{background:var(--teal);}
+  .btn-ghost-sm{background:none;border:1px solid var(--line-dark);color:var(--paper);padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
+  .btn-ghost-sm:hover{border-color:var(--gold);color:var(--gold);}
+  .screen{display:none;}
+  .screen.active{display:block;animation:fadein .35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:10px;}
+  @media(max-width:640px){.role-grid{grid-template-columns:1fr;}}
+  .role-card{background:var(--ink-2);border:1px solid var(--line-dark);border-radius:var(--radius);padding:32px 26px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;}
+  .role-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:var(--shadow);}
+  .role-card .num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;}
+  .role-card h2{font-family:'Fraunces',serif;font-size:24px;margin:10px 0 8px;color:var(--paper);}
+  .role-card p{color:var(--muted);font-size:14px;line-height:1.5;margin:0;}
+  .role-card .arrow{position:absolute;right:22px;bottom:22px;font-size:22px;color:var(--gold);}
+  .panel{background:var(--ink-2);border:1px solid var(--line-dark);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
+  .panel h3{font-family:'Fraunces',serif;font-size:19px;margin:0 0 16px;color:var(--paper);font-weight:600;}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500;}
+  input[type=text]{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line-dark);background:var(--ink);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;font-size:14.5px;}
+  input[type=text]:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px;}
+  .field{margin-bottom:16px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:640px){.field-row{grid-template-columns:1fr;}}
+  .btn{background:var(--gold);color:var(--ink);border:none;padding:12px 22px;border-radius:9px;font-weight:600;font-size:14.5px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:.15s;}
+  .btn:hover:not(:disabled){background:#DDAE4E;}
+  .btn:disabled{background:var(--ink-3);color:var(--muted);cursor:not-allowed;}
+  .btn-secondary{background:none;border:1px solid var(--line-dark);color:var(--paper);padding:11px 20px;border-radius:9px;cursor:pointer;font-size:14px;font-family:'IBM Plex Sans',sans-serif;}
+  .btn-secondary:hover{border-color:var(--gold);color:var(--gold);}
+  .btn-danger{border-color:var(--red);color:var(--red);}
+  .btn-danger:hover{background:var(--red);color:var(--paper);}
+  .criterion-block{background:var(--ink);border:1px solid var(--line-dark);border-radius:12px;padding:20px;margin-bottom:16px;}
+  .criterion-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;}
+  .criterion-num{font-family:'IBM Plex Mono',monospace;color:var(--gold);font-size:13px;letter-spacing:.06em;}
+  .criterion-head h4{margin:0;font-family:'Fraunces',serif;font-size:17px;color:var(--paper);font-weight:600;}
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .chip{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line-dark);background:var(--ink-2);color:var(--paper);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;}
+  .chip:hover{border-color:var(--gold);}
+  .chip.selected{background:var(--gold);color:var(--ink);border-color:var(--gold);transform:scale(1.08) rotate(-2deg);box-shadow:0 3px 8px rgba(200,155,60,0.4);}
+  textarea{width:100%;min-height:64px;padding:11px 13px;border-radius:9px;border:1px solid var(--line-dark);background:var(--ink-2);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;font-size:14px;resize:vertical;}
+  .required-mark{color:var(--gold);}
+  .expert-name-banner{display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);margin-bottom:18px;padding-bottom:14px;border-bottom:1px dashed var(--line-dark);flex-wrap:wrap;gap:8px;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--teal);color:#fff;padding:13px 26px;border-radius:30px;font-size:14px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.3s;z-index:50;font-weight:500;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .mod-stats{display:flex;gap:24px;margin-bottom:18px;flex-wrap:wrap;}
+  .stat{font-family:'IBM Plex Mono',monospace;}
+  .stat .n{font-size:26px;color:var(--gold);font-weight:600;display:block;}
+  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line-dark);border-radius:12px;}
+  table{border-collapse:collapse;width:100%;min-width:980px;background:var(--paper);}
+  thead th{background:var(--ink);color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;padding:12px 10px;text-align:left;position:sticky;top:0;white-space:nowrap;}
+  tbody td{padding:11px 10px;font-size:13.5px;color:var(--text-dark);border-bottom:1px solid var(--line-light);vertical-align:top;}
+  tbody tr:hover{background:var(--paper-2);}
+  .cmt-cell{max-width:180px;color:var(--muted-2);font-style:italic;font-size:12.5px;}
+  .score-cell{font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;}
+  .total-cell{font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold-deep);text-align:center;}
+  .empty-row td{text-align:center;color:var(--muted);padding:40px;font-style:italic;}
+  details.settings summary{cursor:pointer;font-size:14px;color:var(--gold);font-weight:600;margin-bottom:14px;}
+  .print-only{display:none;}
+  @media print{
+    body{background:#fff;color:#000;}
+    .no-print{display:none !important;}
+    .print-only{display:block !important;}
+    #app{max-width:none;padding:0;}
+    .table-wrap{border:none;overflow:visible;}
+    table{min-width:0;width:100%;}
+    thead th{background:#eee !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .cmt-cell{color:#333;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">V</div>
+      <div class="brand-text">
+        <span class="eyebrow">Экспертная оценка · сервер</span>
+        <h1 id="brandTitle">Вердикт</h1>
+      </div>
+    </div>
+    <div class="topbar-actions no-print">
+      <span class="conn-dot" id="connDot"><span class="dot"></span><span id="connLabel">подключение…</span></span>
+      <span id="roleSwitchWrap"></span>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="screen active" id="screen-role">
+      <div class="role-grid">
+        <div class="role-card" onclick="goExpert()">
+          <span class="num">Устройство эксперта</span>
+          <h2>Я эксперт</h2>
+          <p>Выставляю баллы по критериям и пишу комментарии. Оценка уходит модератору мгновенно.</p>
+          <span class="arrow">→</span>
+        </div>
+        <div class="role-card" onclick="goModerator()">
+          <span class="num">Устройство модератора</span>
+          <h2>Я модератор</h2>
+          <p>Вижу таблицу всех оценок в реальном времени, печатаю по шаблону и сохраняю в Excel.</p>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-expert">
+      <div class="panel">
+        <div class="expert-name-banner">
+          <span id="expertEventLabel">Мероприятие: —</span>
+          <span>обновляется мгновенно</span>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Ваше имя</label><input type="text" id="expertName" placeholder="Иванов И.И." oninput="renderSubmitState()"></div>
+          <div class="field"><label>Кого/что вы оцениваете</label><input type="text" id="targetName" placeholder="Участник, проект, номер выступления…"></div>
+        </div>
+        <div id="criteriaContainer"></div>
+        <button class="btn" id="submitBtn" onclick="submitScore()" disabled>Отправить оценку модератору</button>
+        <p style="color:var(--muted);font-size:12.5px;margin-top:10px;">Заполните баллы <span class="required-mark">●</span> и комментарии по всем критериям.</p>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-moderator">
+      <div class="panel">
+        <details class="settings" id="settingsBlock">
+          <summary>Настройки мероприятия и критериев</summary>
+          <div class="field"><label>Название мероприятия</label><input type="text" id="cfgEventName" placeholder="Например: Конкурс проектов 2026"></div>
+          <div class="field-row">
+            <div class="field"><label>Критерий 1</label><input type="text" id="cfgC0"></div>
+            <div class="field"><label>Критерий 2</label><input type="text" id="cfgC1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Критерий 3</label><input type="text" id="cfgC2"></div>
+            <div class="field"><label>Критерий 4</label><input type="text" id="cfgC3"></div>
+          </div>
+          <button class="btn" onclick="saveConfig()">Сохранить настройки</button>
+        </details>
+      </div>
+
+      <div class="panel">
+        <div class="print-only" id="printHeader">
+          <h2 style="font-family:'Fraunces',serif;">Итоговая таблица оценок экспертов</h2>
+          <p id="printMeta"></p>
+        </div>
+        <div class="mod-stats">
+          <div class="stat"><span class="n" id="statCount">0</span><span class="l">оценок получено</span></div>
+          <div class="stat"><span class="n" id="statExperts">0</span><span class="l">уникальных экспертов</span></div>
+          <div class="stat"><span class="n" id="statAvg">—</span><span class="l">средний балл</span></div>
+        </div>
+        <div class="actions-row no-print">
+          <button class="btn-secondary" onclick="window.print()">🖨 Печать</button>
+          <a class="btn" href="/export.xlsx" style="text-decoration:none;display:inline-block;">Скачать Excel (.xlsx)</a>
+          <button class="btn-secondary btn-danger" onclick="clearAllData()">Очистить все данные</button>
+        </div>
+        <div class="table-wrap">
+          <table id="scoreTable">
+            <thead><tr id="tableHeadRow"></tr></thead>
+            <tbody id="tableBody"><tr class="empty-row"><td colspan="14">Пока нет ни одной оценки — ждём экспертов…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DEFAULT_CRITERIA = ["Критерий 1","Критерий 2","Критерий 3","Критерий 4"];
+let config = { eventName: "Мероприятие", criteria: [...DEFAULT_CRITERIA] };
+let submissions = [];
+let scores = [null,null,null,null];
+
+const socket = io();
+
+socket.on('connect', ()=>{
+  document.getElementById('connDot').classList.add('online');
+  document.getElementById('connLabel').textContent = 'подключено';
+});
+socket.on('disconnect', ()=>{
+  document.getElementById('connDot').classList.remove('online');
+  document.getElementById('connLabel').textContent = 'нет связи…';
+});
+socket.on('init', (data)=>{
+  config = data.config; submissions = data.submissions;
+  applyConfigEverywhere();
+  refreshTable();
+});
+socket.on('config:update', (cfg)=>{
+  config = cfg;
+  applyConfigEverywhere();
+  refreshTable();
+});
+socket.on('submissions:update', (list)=>{
+  submissions = list;
+  refreshTable();
+});
+
+function applyConfigEverywhere(){
+  document.getElementById('brandTitle').textContent = config.eventName || 'Вердикт';
+  document.getElementById('expertEventLabel').textContent = 'Мероприятие: ' + config.eventName;
+  renderTableHead();
+  if(document.getElementById('screen-expert').classList.contains('active')) renderCriteria(true);
+}
+
+function goExpert(){
+  show('screen-expert');
+  document.getElementById('roleSwitchWrap').innerHTML = '<button class="btn-ghost-sm" onclick="location.reload()">← сменить роль</button>';
+  renderCriteria();
+}
+function goModerator(){
+  show('screen-moderator');
+  document.getElementById('roleSwitchWrap').innerHTML = '<button class="btn-ghost-sm" onclick="location.reload()">← сменить роль</button>';
+  document.getElementById('cfgEventName').value = config.eventName;
+  document.getElementById('cfgC0').value = config.criteria[0];
+  document.getElementById('cfgC1').value = config.criteria[1];
+  document.getElementById('cfgC2').value = config.criteria[2];
+  document.getElementById('cfgC3').value = config.criteria[3];
+  renderTableHead();
+  refreshTable();
+}
+function show(id){
+  ['screen-role','screen-expert','screen-moderator'].forEach(s=>document.getElementById(s).classList.toggle('active', s===id));
+}
+
+function saveConfig(){
+  const cfg = {
+    eventName: document.getElementById('cfgEventName').value || 'Мероприятие',
+    criteria: [
+      document.getElementById('cfgC0').value || DEFAULT_CRITERIA[0],
+      document.getElementById('cfgC1').value || DEFAULT_CRITERIA[1],
+      document.getElementById('cfgC2').value || DEFAULT_CRITERIA[2],
+      document.getElementById('cfgC3').value || DEFAULT_CRITERIA[3],
+    ]
+  };
+  socket.emit('config:save', cfg);
+  showToast('Настройки сохранены');
+  document.getElementById('settingsBlock').open = false;
+}
+
+function renderCriteria(preserve){
+  const c = document.getElementById('criteriaContainer');
+  c.innerHTML = '';
+  config.criteria.forEach((name, idx)=>{
+    const block = document.createElement('div');
+    block.className = 'criterion-block';
+    const chips = Array.from({length:10}, (_,i)=>i+1).map(n=>
+      `<button type="button" class="chip" data-idx="${idx}" data-val="${n}" onclick="selectScore(${idx},${n})">${n}</button>`
+    ).join('');
+    block.innerHTML = `
+      <div class="criterion-head"><span class="criterion-num">0${idx+1}</span><h4>${escapeHtml(name)}</h4></div>
+      <div class="chip-row">${chips}</div>
+      <textarea id="comment${idx}" placeholder="Комментарий эксперта…" oninput="renderSubmitState()"></textarea>`;
+    c.appendChild(block);
+  });
+  if(!preserve){ scores=[null,null,null,null]; }
+  paintChips();
+  renderSubmitState();
+}
+function selectScore(idx, val){ scores[idx]=val; paintChips(); renderSubmitState(); }
+function paintChips(){
+  document.querySelectorAll('.chip').forEach(ch=>{
+    const idx=+ch.dataset.idx, val=+ch.dataset.val;
+    ch.classList.toggle('selected', scores[idx]===val);
+  });
+}
+function renderSubmitState(){
+  const name = document.getElementById('expertName')?.value.trim();
+  const allScored = scores.every(s=>s!==null && s!==undefined);
+  const allCommented = config.criteria.every((_,idx)=>{
+    const el = document.getElementById('comment'+idx);
+    return el && el.value.trim().length>0;
+  });
+  document.getElementById('submitBtn').disabled = !(name && allScored && allCommented);
+}
+function submitScore(){
+  const expertName = document.getElementById('expertName').value.trim();
+  const target = document.getElementById('targetName').value.trim() || '—';
+  const criteriaData = config.criteria.map((name, idx)=>({
+    criterion: name, score: scores[idx], comment: document.getElementById('comment'+idx).value.trim()
+  }));
+  socket.emit('submission:add', { expertName, target, scores: criteriaData });
+  showToast('✓ Оценка отправлена модератору');
+  document.getElementById('targetName').value = '';
+  config.criteria.forEach((_,idx)=>{ document.getElementById('comment'+idx).value=''; });
+  scores = [null,null,null,null];
+  paintChips();
+  renderSubmitState();
+}
+
+function renderTableHead(){
+  const row = document.getElementById('tableHeadRow');
+  let html = '<th>#</th><th>Время</th><th>Эксперт</th><th>Оцениваемый</th>';
+  config.criteria.forEach(name=>{ html += `<th>${escapeHtml(name)}</th><th>Комментарий</th>`; });
+  html += '<th>Итого</th><th>Средний</th>';
+  row.innerHTML = html;
+}
+function refreshTable(){
+  const tbody = document.getElementById('tableBody');
+  if(!submissions.length){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="${4+config.criteria.length*2+2}">Пока нет ни одной оценки — ждём экспертов…</td></tr>`;
+  } else {
+    tbody.innerHTML = submissions.map((s,i)=>{
+      const t = new Date(s.timestamp);
+      const time = t.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+      let cells = `<td>${i+1}</td><td>${time}</td><td>${escapeHtml(s.expertName)}</td><td>${escapeHtml(s.target)}</td>`;
+      s.scores.forEach(sc=>{ cells += `<td class="score-cell">${sc.score}</td><td class="cmt-cell" title="${escapeHtml(sc.comment)}">${escapeHtml(sc.comment)}</td>`; });
+      cells += `<td class="total-cell">${s.total}</td><td class="total-cell">${s.average}</td>`;
+      return `<tr>${cells}</tr>`;
+    }).join('');
+  }
+  const experts = new Set(submissions.map(s=>s.expertName));
+  document.getElementById('statCount').textContent = submissions.length;
+  document.getElementById('statExperts').textContent = experts.size;
+  document.getElementById('statAvg').textContent = submissions.length ? (submissions.reduce((a,s)=>a+s.average,0)/submissions.length).toFixed(1) : '—';
+  document.getElementById('printMeta').textContent = config.eventName + ' · ' + new Date().toLocaleDateString('ru-RU') + ' · оценок: ' + submissions.length;
+}
+function clearAllData(){
+  if(!confirm('Удалить все полученные оценки? Это необратимо.')) return;
+  socket.emit('data:clear');
+  showToast('Данные очищены');
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+</script>
+</body>
+</html>
