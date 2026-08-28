@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Вердикт — экспертная оценка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  :root{
+    --ink:#14202B; --ink-2:#1E2E3D; --ink-3:#28394A;
+    --paper:#F3F0E6; --paper-2:#EAE5D6;
+    --gold:#C89B3C; --gold-deep:#9C7827; --teal:#3B7A6E; --red:#B24C3C;
+    --line-dark:#3A4B5C; --line-light:#D9D2BE;
+    --text-dark:#1B2430; --muted:#7C8A97; --muted-2:#8B8674;
+    --radius:14px; --shadow:0 8px 24px rgba(20,32,43,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--ink);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+  #app{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:26px 0 18px;border-bottom:1px solid var(--line-dark);margin-bottom:28px;flex-wrap:wrap;gap:14px;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand-mark{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 30% 30%, var(--gold), var(--gold-deep));color:var(--ink);font-family:'Fraunces',serif;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.35);flex-shrink:0;}
+  .brand-text .eyebrow{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:2px;}
+  .brand-text h1{font-family:'Fraunces',serif;font-weight:700;font-size:26px;margin:0;letter-spacing:.01em;color:var(--paper);}
+  .topbar-actions{display:flex;align-items:center;gap:10px;}
+  .conn-dot{display:inline-flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);border:1px solid var(--line-dark);padding:6px 12px;border-radius:20px;}
+  .conn-dot .dot{width:8px;height:8px;border-radius:50%;background:var(--red);}
+  .conn-dot.online .dot{background:var(--teal);}
+  .btn-ghost-sm{background:none;border:1px solid var(--line-dark);color:var(--paper);padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
+  .btn-ghost-sm:hover{border-color:var(--gold);color:var(--gold);}
+  .screen{display:none;}
+  .screen.active{display:block;animation:fadein .35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:10px;}
+  @media(max-width:640px){.role-grid{grid-template-columns:1fr;}}
+  .role-card{background:var(--ink-2);border:1px solid var(--line-dark);border-radius:var(--radius);padding:32px 26px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;}
+  .role-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:var(--shadow);}
+  .role-card .num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;}
+  .role-card h2{font-family:'Fraunces',serif;font-size:24px;margin:10px 0 8px;color:var(--paper);}
+  .role-card p{color:var(--muted);font-size:14px;line-height:1.5;margin:0;}
+  .role-card .arrow{position:absolute;right:22px;bottom:22px;font-size:22px;color:var(--gold);}
+  .expert-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;}
+  @media(max-width:640px){.expert-pick-grid{grid-template-columns:1fr;}}
+  .expert-pick-card{background:var(--ink-2);border:1px solid var(--line-dark);border-radius:12px;padding:22px;cursor:pointer;transition:.15s;text-align:center;}
+  .expert-pick-card:hover{border-color:var(--gold);transform:translateY(-2px);}
+  .expert-pick-card .n{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);letter-spacing:.1em;}
+  .expert-pick-card h3{font-family:'Fraunces',serif;font-size:19px;margin:8px 0 0;color:var(--paper);}
+  .panel{background:var(--ink-2);border:1px solid var(--line-dark);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
+  .panel h3{font-family:'Fraunces',serif;font-size:19px;margin:0 0 16px;color:var(--paper);font-weight:600;}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500;}
+  input[type=text],input[type=password]{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line-dark);background:var(--ink);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;font-size:14.5px;}
+  input:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px;}
+  .field{margin-bottom:16px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:640px){.field-row{grid-template-columns:1fr;}}
+  .btn{background:var(--gold);color:var(--ink);border:none;padding:12px 22px;border-radius:9px;font-weight:600;font-size:14.5px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:.15s;}
+  .btn:hover:not(:disabled){background:#DDAE4E;}
+  .btn:disabled{background:var(--ink-3);color:var(--muted);cursor:not-allowed;}
+  .btn-secondary{background:none;border:1px solid var(--line-dark);color:var(--paper);padding:11px 20px;border-radius:9px;cursor:pointer;font-size:14px;font-family:'IBM Plex Sans',sans-serif;}
+  .btn-secondary:hover{border-color:var(--gold);color:var(--gold);}
+  .btn-danger{border-color:var(--red);color:var(--red);}
+  .btn-danger:hover{background:var(--red);color:var(--paper);}
+  .criterion-block{background:var(--ink);border:1px solid var(--line-dark);border-radius:12px;padding:20px;margin-bottom:16px;}
+  .criterion-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;}
+  .criterion-num{font-family:'IBM Plex Mono',monospace;color:var(--gold);font-size:13px;letter-spacing:.06em;}
+  .criterion-head h4{margin:0;font-family:'Fraunces',serif;font-size:17px;color:var(--paper);font-weight:600;}
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line-dark);background:var(--ink-2);color:var(--paper);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;}
+  .chip:hover{border-color:var(--gold);}
+  .chip.selected{background:var(--gold);color:var(--ink);border-color:var(--gold);transform:scale(1.08) rotate(-2deg);box-shadow:0 3px 8px rgba(200,155,60,0.4);}
+  textarea{width:100%;min-height:90px;padding:11px 13px;border-radius:9px;border:1px solid var(--line-dark);background:var(--ink-2);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;font-size:14px;resize:vertical;}
+  .required-mark{color:var(--gold);}
+  .expert-name-banner{display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);margin-bottom:18px;padding-bottom:14px;border-bottom:1px dashed var(--line-dark);flex-wrap:wrap;gap:8px;}
+  .expert-you{color:var(--gold);font-weight:600;}
+  .tabs{display:flex;gap:8px;margin-bottom:20px;}
+  .tab{background:none;border:1px solid var(--line-dark);color:var(--muted);padding:9px 18px;border-radius:20px;cursor:pointer;font-size:13.5px;font-family:'IBM Plex Sans',sans-serif;}
+  .tab.active{background:var(--gold);color:var(--ink);border-color:var(--gold);font-weight:600;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--teal);color:#fff;padding:13px 26px;border-radius:30px;font-size:14px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.3s;z-index:50;font-weight:500;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--red);}
+  .mod-stats{display:flex;gap:24px;margin-bottom:18px;flex-wrap:wrap;}
+  .stat{font-family:'IBM Plex Mono',monospace;}
+  .stat .n{font-size:26px;color:var(--gold);font-weight:600;display:block;}
+  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line-dark);border-radius:12px;}
+  table{border-collapse:collapse;width:100%;min-width:820px;background:var(--paper);}
+  thead th{background:var(--ink);color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;padding:12px 10px;text-align:left;position:sticky;top:0;white-space:nowrap;}
+  tbody td{padding:11px 10px;font-size:13.5px;color:var(--text-dark);border-bottom:1px solid var(--line-light);vertical-align:top;}
+  tbody tr:hover{background:var(--paper-2);}
+  .cmt-cell{max-width:240px;color:var(--muted-2);font-style:italic;font-size:12.5px;}
+  .score-cell{font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;}
+  .total-cell{font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold-deep);text-align:center;}
+  .empty-row td{text-align:center;color:var(--muted);padding:40px;font-style:italic;}
+  details.settings summary{cursor:pointer;font-size:14px;color:var(--gold);font-weight:600;margin-bottom:14px;}
+  .tech-link{display:block;text-align:center;margin-top:26px;font-size:11.5px;color:var(--muted);opacity:.6;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:'IBM Plex Sans',sans-serif;}
+  .tech-link:hover{opacity:1;}
+  .lock-center{max-width:420px;margin:60px auto;text-align:center;}
+  .lock-center .brand-mark{margin:0 auto 18px;}
+  .lock-center p{color:var(--muted);font-size:14px;margin-bottom:20px;}
+  .print-only{display:none;}
+  @media print{
+    body{background:#fff;color:#000;}
+    .no-print{display:none !important;}
+    .print-only{display:block !important;}
+    #app{max-width:none;padding:0;}
+    .table-wrap{border:none;overflow:visible;}
+    table{min-width:0;width:100%;}
+    thead th{background:#eee !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .cmt-cell{color:#333;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">V</div>
+      <div class="brand-text">
+        <span class="eyebrow">Экспертная оценка · сервер</span>
+        <h1 id="brandTitle">Вердикт</h1>
+      </div>
+    </div>
+    <div class="topbar-actions no-print">
+      <span class="conn-dot" id="connDot"><span class="dot"></span><span id="connLabel">подключение…</span></span>
+      <span id="roleSwitchWrap"></span>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- шаг 1: кто это устройство -->
+    <section class="screen active" id="screen-role">
+      <div class="role-grid">
+        <div class="role-card" onclick="chooseRole('expert')">
+          <span class="num">Устройство эксперта</span>
+          <h2>Я эксперт</h2>
+          <p>Выберете, кто вы, один раз — дальше устройство будет закреплено за этим экспертом.</p>
+          <span class="arrow">→</span>
+        </div>
+        <div class="role-card" onclick="chooseRole('moderator')">
+          <span class="num">Устройство модератора</span>
+          <h2>Я модератор</h2>
+          <p>Потребуется пароль. Live-таблица, печать, экспорт в Excel.</p>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- шаг 1б: выбор конкретного эксперта (один раз, дальше закреплено) -->
+    <section class="screen" id="screen-expert-pick">
+      <div class="panel">
+        <h3>Кто вы?</h3>
+        <p style="color:var(--muted);font-size:13.5px;margin-top:-8px;">Выбор закрепится за этим устройством.</p>
+        <div class="expert-pick-grid" id="expertPickGrid"></div>
+      </div>
+    </section>
+
+    <!-- пароль модератора -->
+    <section class="screen" id="screen-mod-login">
+      <div class="lock-center panel">
+        <div class="brand-mark" style="margin:0 auto 18px;">V</div>
+        <h3>Вход для модератора</h3>
+        <p>Введите пароль, выданный организатором.</p>
+        <div class="field"><input type="password" id="modPasswordInput" placeholder="Пароль" onkeydown="if(event.key==='Enter')modLogin()"></div>
+        <button class="btn" onclick="modLogin()" style="width:100%;">Войти</button>
+      </div>
+    </section>
+
+    <!-- экран эксперта -->
+    <section class="screen" id="screen-expert">
+      <div class="tabs no-print">
+        <button class="tab active" id="tabForm" onclick="switchExpertTab('form')">Моя оценка</button>
+        <button class="tab" id="tabResults" onclick="switchExpertTab('results')">Результаты</button>
+      </div>
+
+      <div id="expertFormView">
+        <div class="panel">
+          <div class="expert-name-banner">
+            <span id="expertEventLabel">Мероприятие: —</span>
+            <span>Вы: <span class="expert-you" id="expertYouLabel">—</span></span>
+          </div>
+
+          <div class="panel" style="background:var(--ink);margin-bottom:20px;padding:16px 20px;">
+            <label style="margin-bottom:2px;">Сейчас оценивается</label>
+            <div style="font-family:'Fraunces',serif;font-size:20px;color:var(--gold);" id="currentTargetDisplay">—</div>
+          </div>
+
+          <div id="criteriaContainer"></div>
+
+          <div class="field">
+            <label>Комментарий <span class="required-mark">●</span></label>
+            <textarea id="sharedComment" placeholder="Общий комментарий по всем критериям…" oninput="renderSubmitState()"></textarea>
+          </div>
+
+          <button class="btn" id="submitBtn" onclick="submitScore()" disabled>Отправить оценку модератору</button>
+          <p style="color:var(--muted);font-size:12.5px;margin-top:10px;">Заполните баллы <span class="required-mark">●</span> по всем критериям и комментарий.</p>
+        </div>
+      </div>
+
+      <div id="expertResultsView" style="display:none;">
+        <div class="panel">
+          <div class="mod-stats">
+            <div class="stat"><span class="n" id="statCountE">0</span><span class="l">оценок получено</span></div>
+            <div class="stat"><span class="n" id="statExpertsE">0</span><span class="l">уникальных экспертов</span></div>
+            <div class="stat"><span class="n" id="statAvgE">—</span><span class="l">средний балл</span></div>
+          </div>
+          <div class="table-wrap">
+            <table id="scoreTableE"><thead><tr id="tableHeadRowE"></tr></thead><tbody id="tableBodyE"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <button class="tech-link no-print" onclick="techAccess()">Технический доступ</button>
+    </section>
+
+    <!-- экран модератора -->
+    <section class="screen" id="screen-moderator">
+      <div class="panel">
+        <h3 style="margin-bottom:12px;">Сейчас оценивается</h3>
+        <div class="field-row" style="align-items:flex-end;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Участник / проект / номер выступления</label>
+            <input type="text" id="currentTargetInput" placeholder="Например: Участник №3 — Иванова Мария">
+          </div>
+          <button class="btn" onclick="setCurrentTarget()" style="height:44px;">Обновить у всех экспертов</button>
+        </div>
+        <p style="color:var(--muted);font-size:12.5px;margin:10px 0 0;">Меняйте перед каждым новым участником/выступлением — эксперты увидят обновление мгновенно.</p>
+      </div>
+
+      <div class="panel">
+        <details class="settings" id="settingsBlock">
+          <summary>Настройки мероприятия, критериев и экспертов</summary>
+          <div class="field"><label>Название мероприятия</label><input type="text" id="cfgEventName"></div>
+          <div class="field-row">
+            <div class="field"><label>Критерий 1</label><input type="text" id="cfgC0"></div>
+            <div class="field"><label>Критерий 2</label><input type="text" id="cfgC1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Критерий 3</label><input type="text" id="cfgC2"></div>
+            <div class="field"><label>Критерий 4</label><input type="text" id="cfgC3"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Эксперт 1</label><input type="text" id="cfgE0"></div>
+            <div class="field"><label>Эксперт 2</label><input type="text" id="cfgE1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Эксперт 3</label><input type="text" id="cfgE2"></div>
+            <div class="field"><label>Эксперт 4</label><input type="text" id="cfgE3"></div>
+          </div>
+          <button class="btn" onclick="saveConfig()">Сохранить настройки</button>
+        </details>
+      </div>
+
+      <div class="panel">
+        <div class="print-only" id="printHeader">
+          <h2 style="font-family:'Fraunces',serif;">Итоговая таблица оценок экспертов</h2>
+          <p id="printMeta"></p>
+        </div>
+        <div class="mod-stats">
+          <div class="stat"><span class="n" id="statCount">0</span><span class="l">оценок получено</span></div>
+          <div class="stat"><span class="n" id="statExperts">0</span><span class="l">уникальных экспертов</span></div>
+          <div class="stat"><span class="n" id="statAvg">—</span><span class="l">средний балл</span></div>
+        </div>
+        <div class="actions-row no-print">
+          <button class="btn-secondary" onclick="window.print()">🖨 Печать</button>
+          <a class="btn" href="/export.xlsx" style="text-decoration:none;display:inline-block;">Скачать Excel (.xlsx)</a>
+          <button class="btn-secondary btn-danger" onclick="clearAllData()">Очистить все данные</button>
+        </div>
+        <div class="table-wrap">
+          <table id="scoreTable"><thead><tr id="tableHeadRow"></tr></thead><tbody id="tableBody"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DEFAULT_CRITERIA = ["Критерий 1","Критерий 2","Критерий 3","Критерий 4"];
+const DEFAULT_EXPERTS = ["Эксперт 1","Эксперт 2","Эксперт 3","Эксперт 4"];
+let config = { eventName: "Мероприятие", criteria: [...DEFAULT_CRITERIA], experts: [...DEFAULT_EXPERTS], target: "" };
+let submissions = [];
+let scores = [null,null,null,null];
+
+const LS_ROLE = 'verdict_role';
+const LS_EXPERT_IDX = 'verdict_expert_idx';
+const LS_MOD_AUTH = 'verdict_mod_auth';
+
+const socket = io();
+
+socket.on('connect', ()=>{
+  document.getElementById('connDot').classList.add('online');
+  document.getElementById('connLabel').textContent = 'подключено';
+});
+socket.on('disconnect', ()=>{
+  document.getElementById('connDot').classList.remove('online');
+  document.getElementById('connLabel').textContent = 'нет связи…';
+});
+socket.on('init', (data)=>{
+  config = data.config; submissions = data.submissions;
+  applyConfigEverywhere();
+  refreshAllTables();
+  routeOnLoad();
+});
+socket.on('config:update', (cfg)=>{
+  config = cfg;
+  applyConfigEverywhere();
+  refreshAllTables();
+});
+socket.on('submissions:update', (list)=>{
+  submissions = list;
+  refreshAllTables();
+});
+
+function applyConfigEverywhere(){
+  document.getElementById('brandTitle').textContent = config.eventName || 'Вердикт';
+  document.getElementById('expertEventLabel').textContent = 'Мероприятие: ' + config.eventName;
+  document.getElementById('currentTargetDisplay').textContent = config.target && config.target.trim() ? config.target : '— пока не задано модератором —';
+  const targetInputEl = document.getElementById('currentTargetInput');
+  if(targetInputEl && document.activeElement !== targetInputEl) targetInputEl.value = config.target || '';
+  renderTableHead('tableHeadRow');
+  renderTableHead('tableHeadRowE');
+  const idx = localStorage.getItem(LS_EXPERT_IDX);
+  if(idx !== null && config.experts[idx]){
+    document.getElementById('expertYouLabel').textContent = config.experts[idx];
+  }
+  if(document.getElementById('screen-expert').classList.contains('active')) renderCriteria(true);
+}
+
+// ---------- маршрутизация при загрузке ----------
+function routeOnLoad(){
+  const role = localStorage.getItem(LS_ROLE);
+  if(role === 'expert'){
+    const idx = localStorage.getItem(LS_EXPERT_IDX);
+    if(idx !== null && config.experts[idx]){
+      enterExpertScreen(+idx);
+    } else {
+      showExpertPick();
+    }
+  } else if(role === 'moderator' && localStorage.getItem(LS_MOD_AUTH) === 'true'){
+    enterModeratorScreen();
+  } else {
+    show('screen-role');
+  }
+}
+
+function chooseRole(role){
+  if(role === 'expert'){
+    localStorage.setItem(LS_ROLE, 'expert');
+    showExpertPick();
+  } else {
+    show('screen-mod-login');
+  }
+}
+
+function showExpertPick(){
+  const grid = document.getElementById('expertPickGrid');
+  grid.innerHTML = config.experts.map((name, i)=>`
+    <div class="expert-pick-card" onclick="pickExpert(${i})">
+      <span class="n">0${i+1}</span>
+      <h3>${escapeHtml(name)}</h3>
+    </div>`).join('');
+  show('screen-expert-pick');
+}
+function pickExpert(idx){
+  localStorage.setItem(LS_EXPERT_IDX, idx);
+  enterExpertScreen(idx);
+}
+function enterExpertScreen(idx){
+  document.getElementById('expertYouLabel').textContent = config.experts[idx] || ('Эксперт ' + (idx+1));
+  document.getElementById('roleSwitchWrap').innerHTML = '';
+  renderCriteria();
+  switchExpertTab('form');
+  show('screen-expert');
+}
+
+function modLogin(){
+  const pwd = document.getElementById('modPasswordInput').value;
+  socket.emit('moderator:login', pwd, (res)=>{
+    if(res && res.ok){
+      localStorage.setItem(LS_ROLE, 'moderator');
+      localStorage.setItem(LS_MOD_AUTH, 'true');
+      window._modPassword = pwd;
+      document.getElementById('modPasswordInput').value = '';
+      enterModeratorScreen();
+    } else {
+      showToast('Неверный пароль', true);
+    }
+  });
+}
+function enterModeratorScreen(){
+  document.getElementById('roleSwitchWrap').innerHTML = '<button class="btn-ghost-sm" onclick="logoutModerator()">Выйти</button>';
+  document.getElementById('cfgEventName').value = config.eventName;
+  document.getElementById('cfgC0').value = config.criteria[0];
+  document.getElementById('cfgC1').value = config.criteria[1];
+  document.getElementById('cfgC2').value = config.criteria[2];
+  document.getElementById('cfgC3').value = config.criteria[3];
+  document.getElementById('cfgE0').value = config.experts[0];
+  document.getElementById('cfgE1').value = config.experts[1];
+  document.getElementById('cfgE2').value = config.experts[2];
+  document.getElementById('cfgE3').value = config.experts[3];
+  refreshAllTables();
+  show('screen-moderator');
+}
+function logoutModerator(){
+  localStorage.removeItem(LS_ROLE);
+  localStorage.removeItem(LS_MOD_AUTH);
+  window._modPassword = null;
+  location.reload();
+}
+
+// "запасной выход" для эксперта — только по паролю модератора
+function techAccess(){
+  const pwd = prompt('Технический доступ. Введите пароль модератора, чтобы отвязать это устройство:');
+  if(pwd === null) return;
+  socket.emit('moderator:login', pwd, (res)=>{
+    if(res && res.ok){
+      localStorage.clear();
+      location.reload();
+    } else {
+      showToast('Неверный пароль', true);
+    }
+  });
+}
+
+function show(id){
+  ['screen-role','screen-expert-pick','screen-mod-login','screen-expert','screen-moderator'].forEach(s=>document.getElementById(s).classList.toggle('active', s===id));
+}
+
+function switchExpertTab(tab){
+  document.getElementById('tabForm').classList.toggle('active', tab==='form');
+  document.getElementById('tabResults').classList.toggle('active', tab==='results');
+  document.getElementById('expertFormView').style.display = tab==='form' ? '' : 'none';
+  document.getElementById('expertResultsView').style.display = tab==='results' ? '' : 'none';
+}
+
+// ---------- настройки (модератор) ----------
+function setCurrentTarget(){
+  const val = document.getElementById('currentTargetInput').value.trim();
+  const cfg = {
+    password: window._modPassword || '',
+    eventName: config.eventName,
+    criteria: config.criteria,
+    experts: config.experts,
+    target: val
+  };
+  socket.emit('config:save', cfg, (res)=>{
+    if(res && res.ok){ showToast('Обновлено у всех экспертов'); }
+    else { showToast('Не удалось обновить (пароль?)', true); }
+  });
+}
+
+function saveConfig(){
+  const cfg = {
+    password: window._modPassword || '',
+    eventName: document.getElementById('cfgEventName').value || 'Мероприятие',
+    criteria: [
+      document.getElementById('cfgC0').value || DEFAULT_CRITERIA[0],
+      document.getElementById('cfgC1').value || DEFAULT_CRITERIA[1],
+      document.getElementById('cfgC2').value || DEFAULT_CRITERIA[2],
+      document.getElementById('cfgC3').value || DEFAULT_CRITERIA[3],
+    ],
+    experts: [
+      document.getElementById('cfgE0').value || DEFAULT_EXPERTS[0],
+      document.getElementById('cfgE1').value || DEFAULT_EXPERTS[1],
+      document.getElementById('cfgE2').value || DEFAULT_EXPERTS[2],
+      document.getElementById('cfgE3').value || DEFAULT_EXPERTS[3],
+    ],
+    target: config.target || ''
+  };
+  socket.emit('config:save', cfg, (res)=>{
+    if(res && res.ok){
+      showToast('Настройки сохранены');
+      document.getElementById('settingsBlock').open = false;
+    } else {
+      showToast('Не удалось сохранить (пароль?)', true);
+    }
+  });
+}
+
+// ---------- форма эксперта ----------
+function renderCriteria(preserve){
+  const c = document.getElementById('criteriaContainer');
+  c.innerHTML = '';
+  config.criteria.forEach((name, idx)=>{
+    const block = document.createElement('div');
+    block.className = 'criterion-block';
+    const chips = Array.from({length:10}, (_,i)=>i+1).map(n=>
+      `<button type="button" class="chip" data-idx="${idx}" data-val="${n}" onclick="selectScore(${idx},${n})">${n}</button>`
+    ).join('');
+    block.innerHTML = `
+      <div class="criterion-head"><span class="criterion-num">0${idx+1}</span><h4>${escapeHtml(name)}</h4></div>
+      <div class="chip-row">${chips}</div>`;
+    c.appendChild(block);
+  });
+  if(!preserve){ scores=[null,null,null,null]; }
+  paintChips();
+  renderSubmitState();
+}
+function selectScore(idx, val){ scores[idx]=val; paintChips(); renderSubmitState(); }
+function paintChips(){
+  document.querySelectorAll('.chip').forEach(ch=>{
+    const idx=+ch.dataset.idx, val=+ch.dataset.val;
+    ch.classList.toggle('selected', scores[idx]===val);
+  });
+}
+function renderSubmitState(){
+  const allScored = scores.every(s=>s!==null && s!==undefined);
+  const commentOk = document.getElementById('sharedComment')?.value.trim().length>0;
+  document.getElementById('submitBtn').disabled = !(allScored && commentOk);
+}
+function submitScore(){
+  const idx = +localStorage.getItem(LS_EXPERT_IDX);
+  const expertName = config.experts[idx];
+  const comment = document.getElementById('sharedComment').value.trim();
+  const criteriaData = config.criteria.map((name, i)=>({ criterion: name, score: scores[i] }));
+  socket.emit('submission:add', { expertId: idx, expertName, scores: criteriaData, comment });
+  showToast('✓ Оценка отправлена модератору');
+  document.getElementById('sharedComment').value = '';
+  scores = [null,null,null,null];
+  paintChips();
+  renderSubmitState();
+}
+
+// ---------- таблицы ----------
+function renderTableHead(elId){
+  const row = document.getElementById(elId);
+  let html = '<th>#</th><th>Время</th><th>Эксперт</th><th>Оцениваемый</th>';
+  config.criteria.forEach(name=>{ html += `<th>${escapeHtml(name)}</th>`; });
+  html += '<th>Итого</th><th>Средний</th><th>Комментарий</th>';
+  row.innerHTML = html;
+}
+function buildRows(){
+  if(!submissions.length){
+    return `<tr class="empty-row"><td colspan="${5+config.criteria.length}">Пока нет ни одной оценки — ждём экспертов…</td></tr>`;
+  }
+  return submissions.map((s,i)=>{
+    const t = new Date(s.timestamp);
+    const time = t.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    let cells = `<td>${i+1}</td><td>${time}</td><td>${escapeHtml(s.expertName)}</td><td>${escapeHtml(s.target)}</td>`;
+    s.scores.forEach(sc=>{ cells += `<td class="score-cell">${sc.score}</td>`; });
+    cells += `<td class="total-cell">${s.total}</td><td class="total-cell">${s.average}</td>`;
+    cells += `<td class="cmt-cell" title="${escapeHtml(s.comment||'')}">${escapeHtml(s.comment||'')}</td>`;
+    return `<tr>${cells}</tr>`;
+  }).join('');
+}
+function refreshAllTables(){
+  const rows = buildRows();
+  document.getElementById('tableBody').innerHTML = rows;
+  document.getElementById('tableBodyE').innerHTML = rows;
+  const experts = new Set(submissions.map(s=>s.expertName));
+  const avg = submissions.length ? (submissions.reduce((a,s)=>a+s.average,0)/submissions.length).toFixed(1) : '—';
+  document.getElementById('statCount').textContent = submissions.length;
+  document.getElementById('statExperts').textContent = experts.size;
+  document.getElementById('statAvg').textContent = avg;
+  document.getElementById('statCountE').textContent = submissions.length;
+  document.getElementById('statExpertsE').textContent = experts.size;
+  document.getElementById('statAvgE').textContent = avg;
+  document.getElementById('printMeta').textContent = config.eventName + ' · ' + new Date().toLocaleDateString('ru-RU') + ' · оценок: ' + submissions.length;
+}
+function clearAllData(){
+  if(!confirm('Удалить все полученные оценки? Это необратимо.')) return;
+  socket.emit('data:clear', window._modPassword || '', (res)=>{
+    if(res && res.ok){ showToast('Данные очищены'); }
+    else { showToast('Не удалось очистить (пароль?)', true); }
+  });
+}
+
+// ---------- utils ----------
+function showToast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('err', !!isErr);
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+</script>
+</body>
+</html>
