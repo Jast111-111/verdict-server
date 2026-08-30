@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Вердикт — экспертная оценка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  :root{
+    --bg:#040A40; --s1:#07104F; --s2:#0B155C;
+    --active:#1F5CFF; --accent:#2FD2FF; --violet:#8B6CFF;
+    --success:#42D392; --warning:#FFC857; --error:#FF5573;
+    --text:#FFFFFF; --text2:rgba(255,255,255,.72); --text3:rgba(255,255,255,.50); --text-dis:rgba(255,255,255,.30);
+    --border:rgba(255,255,255,.10); --border-soft:rgba(255,255,255,.08); --crit-bg:rgba(255,255,255,.04);
+    --radius:16px; --shadow:0 12px 30px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+  #app{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:22px 0 16px;border-bottom:1px solid var(--border);margin-bottom:26px;flex-wrap:wrap;gap:14px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg, var(--active), var(--accent));color:#04102E;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand-text .eyebrow{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);font-weight:600;margin-bottom:2px;}
+  .brand-text h1{font-weight:700;font-size:20px;margin:0;letter-spacing:.01em;color:var(--text);}
+  .topbar-actions{display:flex;align-items:center;gap:10px;}
+  .conn-dot{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text3);border:1px solid var(--border);padding:6px 12px;border-radius:20px;font-weight:600;}
+  .conn-dot .dot{width:8px;height:8px;border-radius:50%;background:var(--error);}
+  .conn-dot.online .dot{background:var(--success);box-shadow:0 0 8px var(--success);}
+  .btn-ghost-sm{background:none;border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;}
+  .btn-ghost-sm:hover{border-color:var(--accent);color:var(--accent);}
+  .screen{display:none;}
+  .screen.active{display:block;animation:fadein .3s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px;}
+  @media(max-width:640px){.role-grid{grid-template-columns:1fr;}}
+  .role-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:30px 24px;cursor:pointer;transition:.2s;position:relative;}
+  .role-card:hover{border-color:var(--active);transform:translateY(-2px);box-shadow:var(--shadow);}
+  .role-card .num{font-size:11px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;font-weight:700;}
+  .role-card h2{font-weight:700;font-size:22px;margin:10px 0 8px;color:var(--text);}
+  .role-card p{color:var(--text2);font-size:14px;line-height:1.5;margin:0;}
+  .role-card .arrow{position:absolute;right:22px;bottom:22px;font-size:20px;color:var(--accent);}
+
+  .expert-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;}
+  @media(max-width:640px){.expert-pick-grid{grid-template-columns:1fr;}}
+  .expert-pick-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;transition:.15s;text-align:center;}
+  .expert-pick-card:hover{border-color:var(--active);transform:translateY(-2px);}
+  .expert-pick-card .n{font-size:11px;color:var(--accent);letter-spacing:.1em;font-weight:700;}
+  .expert-pick-card h3{font-weight:700;font-size:17px;margin:6px 0 0;color:var(--text);}
+
+  .panel{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:18px;}
+  .panel h3{font-weight:700;font-size:17px;margin:0 0 14px;color:var(--text);}
+  label{display:block;font-size:12.5px;color:var(--text2);margin-bottom:6px;font-weight:600;}
+  input[type=text],input[type=number],input[type=password]{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;}
+  input:focus,textarea:focus{outline:2px solid var(--active);outline-offset:1px;}
+  .field{margin-bottom:14px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:640px){.field-row{grid-template-columns:1fr;}}
+  .btn{background:var(--active);color:#fff;border:none;padding:12px 22px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;transition:.15s;}
+  .btn:hover:not(:disabled){background:#3D6EFF;}
+  .btn:disabled{background:var(--s2);color:var(--text-dis);cursor:not-allowed;}
+  .btn-secondary{background:none;border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;cursor:pointer;font-size:13.5px;font-family:'Inter',sans-serif;font-weight:600;}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-danger{border-color:var(--error);color:var(--error);}
+  .btn-danger:hover{background:var(--error);color:#fff;}
+  .btn-icon{background:none;border:1px solid var(--border);color:var(--text2);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:14px;}
+  .btn-icon:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* ---------- Hero: текущий участник ---------- */
+  .hero-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--radius);padding:26px;margin-bottom:16px;position:relative;overflow:hidden;}
+  .hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .hero-number{font-weight:800;font-size:clamp(40px,8vw,60px);line-height:1;color:var(--text);letter-spacing:-.01em;}
+  .hero-meta{margin-top:6px;}
+  .hero-name{font-weight:700;font-size:20px;color:var(--text);margin:0 0 2px;}
+  .hero-sub{color:var(--text2);font-size:13.5px;}
+  .hero-event{color:var(--accent);font-size:13.5px;margin-top:4px;font-weight:600;}
+  .status-badge{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border-radius:20px;flex-shrink:0;}
+  .status-waiting{background:rgba(255,255,255,.08);color:var(--text2);}
+  .status-done{background:rgba(66,211,146,.15);color:var(--success);}
+  .nav-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:18px;}
+  .nav-btn{background:var(--crit-bg);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:700;font-family:'Inter',sans-serif;}
+  .nav-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+  .nav-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+  /* ---------- полоска участников ---------- */
+  .strip-wrap{overflow-x:auto;margin-bottom:18px;}
+  .strip{display:flex;gap:8px;padding-bottom:4px;}
+  .strip-item{flex-shrink:0;width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--s1);color:var(--text3);}
+  .strip-item.done{background:rgba(66,211,146,.12);color:var(--success);border-color:rgba(66,211,146,.3);}
+  .strip-item.current{background:var(--active);color:#fff;border-color:var(--active);box-shadow:0 0 0 3px rgba(31,92,255,.25);}
+
+  /* ---------- прогресс ---------- */
+  .progress-row{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--text2);margin-bottom:6px;font-weight:600;}
+  .progress-bar{height:6px;border-radius:4px;background:var(--crit-bg);overflow:hidden;margin-bottom:20px;}
+  .progress-fill{height:100%;background:linear-gradient(90deg, var(--active), var(--accent));border-radius:4px;transition:width .3s;}
+
+  /* ---------- критерии (степпер) ---------- */
+  .criterion-row{background:var(--crit-bg);border:1px solid var(--border-soft);border-radius:14px;padding:16px 18px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;}
+  .criterion-name{font-weight:600;font-size:14.5px;color:var(--text);}
+  .stepper{display:flex;align-items:center;gap:14px;}
+  .stepper button{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--s1);color:var(--text);font-size:19px;cursor:pointer;font-family:'Inter',sans-serif;line-height:1;}
+  .stepper button:hover:not(:disabled){border-color:var(--active);color:var(--accent);}
+  .stepper button:disabled{opacity:.3;cursor:not-allowed;}
+  .stepper .val{width:34px;text-align:center;font-weight:800;font-size:22px;color:var(--active);}
+  .stepper .val.empty{color:var(--text-dis);font-weight:600;font-size:16px;}
+
+  .total-row{display:flex;justify-content:space-between;align-items:center;background:var(--s2);border-radius:14px;padding:18px 20px;margin:18px 0;}
+  .total-label{font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);}
+  .total-val{font-weight:800;font-size:30px;background:linear-gradient(90deg, var(--active), var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+
+  textarea{width:100%;min-height:110px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;resize:vertical;}
+  .required-mark{color:var(--accent);}
+
+  .tabs{display:flex;gap:8px;margin-bottom:18px;}
+  .tab{background:none;border:1px solid var(--border);color:var(--text2);padding:9px 18px;border-radius:20px;cursor:pointer;font-size:13.5px;font-family:'Inter',sans-serif;font-weight:600;}
+  .tab.active{background:var(--active);color:#fff;border-color:var(--active);}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--success);color:#04102E;padding:13px 26px;border-radius:30px;font-size:14px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.3s;z-index:50;font-weight:700;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--error);color:#fff;}
+
+  .mod-stats{display:flex;gap:22px;margin-bottom:16px;flex-wrap:wrap;}
+  .stat .n{font-size:24px;color:var(--accent);font-weight:800;display:block;}
+  .stat .l{font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;}
+  table{border-collapse:collapse;width:100%;min-width:820px;background:#fff;}
+  thead th{background:var(--s2);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:11px 10px;text-align:left;position:sticky;top:0;white-space:nowrap;font-weight:700;}
+  tbody td{padding:10px;font-size:13px;color:#131A33;border-bottom:1px solid #E4E2F0;vertical-align:top;}
+  tbody tr:hover{background:#F4F3FA;}
+  .cmt-cell{max-width:220px;color:#585B70;font-style:italic;font-size:12px;}
+  .score-cell{font-weight:700;text-align:center;}
+  .total-cell{font-weight:800;color:#1F5CFF;text-align:center;}
+  .empty-row td{text-align:center;color:#8A8D9E;padding:36px;font-style:italic;}
+  details.settings summary{cursor:pointer;font-size:14px;color:var(--accent);font-weight:700;margin-bottom:14px;}
+  .tech-link{display:block;text-align:center;margin-top:24px;font-size:11px;color:var(--text3);opacity:.6;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;}
+  .tech-link:hover{opacity:1;}
+  .lock-center{max-width:400px;margin:60px auto;text-align:center;}
+  .lock-center .brand-mark{margin:0 auto 16px;}
+  .lock-center p{color:var(--text2);font-size:14px;margin-bottom:18px;}
+
+  /* ---------- участники: список у модератора ---------- */
+  .participants-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .participants-table th{text-align:left;color:var(--text3);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:8px 8px;border-bottom:1px solid var(--border);}
+  .participants-table td{padding:9px 8px;border-bottom:1px solid var(--border-soft);color:var(--text);}
+  .participants-table input{padding:6px 8px;font-size:13px;}
+  .row-actions{display:flex;gap:6px;}
+  .upload-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+  .upload-row input[type=file]{color:var(--text2);font-size:13px;}
+  .hint{color:var(--text3);font-size:12px;margin:6px 0 16px;}
+
+  /* ---------- карточки результатов по участнику (модератор) ---------- */
+  .result-card{background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
+  .result-card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .result-card-head h4{margin:0;font-size:16px;font-weight:700;}
+  .result-mini-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}
+  .result-mini-table th{text-align:left;color:var(--text3);font-size:10px;text-transform:uppercase;padding:5px 6px;border-bottom:1px solid var(--border);}
+  .result-mini-table td{padding:6px;border-bottom:1px solid var(--border-soft);color:var(--text2);}
+
+  #printSingleContainer{display:none;}
+  @media print{
+    body{background:#fff;color:#000;}
+    .no-print{display:none !important;}
+    #app{max-width:none;padding:0;}
+    table{min-width:0;width:100%;}
+    body.printing-single .print-hide-on-single{display:none !important;}
+    body.printing-single #printSingleContainer{display:block !important;background:#fff;color:#000;}
+    body.printing-single #printSingleContainer table{width:100%;}
+    body.printing-single #printSingleContainer th{background:#eee !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">V</div>
+      <div class="brand-text">
+        <span class="eyebrow">Экспертная оценка · сервер</span>
+        <h1 id="brandTitle">Вердикт</h1>
+      </div>
+    </div>
+    <div class="topbar-actions no-print">
+      <span class="conn-dot" id="connDot"><span class="dot"></span><span id="connLabel">подключение…</span></span>
+      <span id="roleSwitchWrap"></span>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <section class="screen active" id="screen-role">
+      <div class="role-grid">
+        <div class="role-card" onclick="chooseRole('expert')">
+          <span class="num">Устройство эксперта</span>
+          <h2>Я эксперт</h2>
+          <p>Выберете, кто вы, один раз — дальше устройство закреплено за этим экспертом.</p>
+          <span class="arrow">→</span>
+        </div>
+        <div class="role-card" onclick="chooseRole('moderator')">
+          <span class="num">Устройство модератора</span>
+          <h2>Я модератор</h2>
+          <p>Потребуется пароль. Список участников, live-результаты, печать, экспорт в Excel.</p>
+          <span class="arrow">→</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-expert-pick">
+      <div class="panel">
+        <h3>Кто вы?</h3>
+        <p style="color:var(--text2);font-size:13px;margin-top:-8px;">Выбор закрепится за этим устройством.</p>
+        <div class="expert-pick-grid" id="expertPickGrid"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-mod-login">
+      <div class="lock-center panel">
+        <div class="brand-mark" style="margin:0 auto 16px;">V</div>
+        <h3>Вход для модератора</h3>
+        <p>Введите пароль, выданный организатором.</p>
+        <div class="field"><input type="password" id="modPasswordInput" placeholder="Пароль" onkeydown="if(event.key==='Enter')modLogin()"></div>
+        <button class="btn" onclick="modLogin()" style="width:100%;">Войти</button>
+      </div>
+    </section>
+
+    <!-- ЭКСПЕРТ -->
+    <section class="screen" id="screen-expert">
+      <div class="tabs no-print">
+        <button class="tab active" id="tabForm" onclick="switchExpertTab('form')">Оценка</button>
+        <button class="tab" id="tabResults" onclick="switchExpertTab('results')">Результаты</button>
+      </div>
+
+      <div id="expertFormView">
+        <div class="progress-row"><span id="progressLabel">Оценено 0 / 0</span><span id="expertYouLabel2">—</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+        <div class="strip-wrap no-print"><div class="strip" id="participantStrip"></div></div>
+
+        <div class="hero-card">
+          <div class="hero-top">
+            <div>
+              <div class="hero-number" id="heroNumber">—</div>
+              <div class="hero-meta">
+                <div class="hero-name" id="heroName">Нет участников</div>
+                <div class="hero-sub" id="heroSub"></div>
+                <div class="hero-event" id="heroEvent"></div>
+              </div>
+            </div>
+            <span class="status-badge status-waiting" id="heroStatus">ОЖИДАЕТ</span>
+          </div>
+          <div class="nav-row no-print">
+            <button class="nav-btn" id="prevBtn" onclick="navPrev()">← Предыдущий</button>
+            <button class="nav-btn" id="nextBtn" onclick="navNext()">Следующий →</button>
+          </div>
+        </div>
+
+        <div id="criteriaContainer"></div>
+
+        <div class="total-row">
+          <span class="total-label">Итого</span>
+          <span class="total-val" id="totalVal">— / —</span>
+        </div>
+
+        <div class="field">
+          <label>Комментарий <span class="required-mark">●</span></label>
+          <textarea id="sharedComment" placeholder="Что особенно удалось? Что можно развивать?" oninput="renderSubmitState()"></textarea>
+        </div>
+
+        <button class="btn" id="submitBtn" onclick="submitScore()" disabled style="width:100%;height:52px;font-size:15px;">СОХРАНИТЬ ОЦЕНКУ</button>
+        <p style="color:var(--text3);font-size:12px;margin-top:10px;text-align:center;">Заполните баллы по всем критериям и комментарий.</p>
+      </div>
+
+      <div id="expertResultsView" style="display:none;">
+        <div class="panel">
+          <div class="mod-stats">
+            <div class="stat"><span class="n" id="statCountE">0</span><span class="l">оценок получено</span></div>
+            <div class="stat"><span class="n" id="statExpertsE">0</span><span class="l">уникальных экспертов</span></div>
+          </div>
+          <div class="table-wrap">
+            <table id="scoreTableE"><thead><tr id="tableHeadRowE"></tr></thead><tbody id="tableBodyE"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <button class="tech-link no-print" onclick="techAccess()">Технический доступ</button>
+    </section>
+
+    <!-- МОДЕРАТОР -->
+    <section class="screen" id="screen-moderator">
+      <div class="panel">
+        <details class="settings" id="settingsBlock">
+          <summary>Настройки мероприятия, критериев и экспертов</summary>
+          <div class="field"><label>Название мероприятия</label><input type="text" id="cfgEventName"></div>
+          <div class="field-row">
+            <div class="field"><label>Критерий 1</label><input type="text" id="cfgC0"></div>
+            <div class="field"><label>Критерий 2</label><input type="text" id="cfgC1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Критерий 3</label><input type="text" id="cfgC2"></div>
+            <div class="field"><label>Критерий 4</label><input type="text" id="cfgC3"></div>
+          </div>
+          <label style="margin-top:8px;">Эксперты</label>
+          <div id="expertsFieldsContainer" style="margin-bottom:14px;"></div>
+          <button type="button" class="btn-secondary" onclick="addExpertField()" style="margin-bottom:16px;">+ Добавить эксперта</button>
+          <br>
+          <button class="btn" onclick="saveConfig()">Сохранить настройки</button>
+        </details>
+      </div>
+
+      <div class="panel">
+        <h3>Участники</h3>
+        <p class="hint">Импорт из файла: столбцы в порядке <b>Имя, Возраст, Мероприятие/номинация</b> (первая строка — заголовок или сразу данные, определится автоматически). Поддерживаются .xlsx и .docx (таблица в документе).</p>
+        <div class="upload-row">
+          <input type="file" id="importFileInput" accept=".xlsx,.xls,.docx">
+          <button class="btn-secondary" onclick="importParticipants()">Импортировать из файла</button>
+        </div>
+        <div class="field-row" style="align-items:flex-end;margin-top:10px;">
+          <div class="field" style="margin-bottom:0;"><label>Имя</label><input type="text" id="newPName" placeholder="Имя участника"></div>
+          <div class="field" style="margin-bottom:0;"><label>Возраст</label><input type="number" id="newPAge" placeholder="14"></div>
+        </div>
+        <div class="field" style="margin-top:10px;"><label>Мероприятие / номинация</label><input type="text" id="newPEvent" placeholder="Например: Вокал соло"></div>
+        <button class="btn-secondary" onclick="addParticipant()" style="margin-top:6px;">+ Добавить участника</button>
+
+        <div class="table-wrap" style="margin-top:18px;background:var(--bg);border-color:var(--border);">
+          <table class="participants-table" id="participantsTable">
+            <thead><tr><th>№</th><th>Имя</th><th>Возраст</th><th>Мероприятие</th><th>Оценок</th><th></th></tr></thead>
+            <tbody id="participantsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="mod-stats">
+          <div class="stat"><span class="n" id="statCount">0</span><span class="l">оценок получено</span></div>
+          <div class="stat"><span class="n" id="statExperts">0</span><span class="l">уникальных экспертов</span></div>
+        </div>
+        <div class="actions-row no-print">
+          <button class="btn-secondary" onclick="printAll()">🖨 Печать всей таблицы</button>
+          <a class="btn" href="/export.xlsx" style="text-decoration:none;display:inline-block;">Скачать Excel (.xlsx)</a>
+          <button class="btn-secondary btn-danger" onclick="clearAllData()">Очистить все данные</button>
+        </div>
+        <div class="table-wrap print-hide-on-single" id="fullTableWrap">
+          <table id="scoreTable"><thead><tr id="tableHeadRow"></tr></thead><tbody id="tableBody"></tbody></table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Результаты по участникам</h3>
+        <div id="resultCardsContainer"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<div id="printSingleContainer"></div>
+
+<script>
+const DEFAULT_CRITERIA = ["Критерий 1","Критерий 2","Критерий 3","Критерий 4"];
+const DEFAULT_EXPERTS = ["Эксперт 1","Эксперт 2","Эксперт 3","Эксперт 4"];
+let config = { eventName: "Мероприятие", criteria: [...DEFAULT_CRITERIA], experts: [...DEFAULT_EXPERTS] };
+let participants = [];
+let submissions = [];
+let scores = [];
+let editingExperts = [];
+let navIdx = 0; // индекс текущего участника у эксперта
+
+const LS_ROLE = 'verdict_role';
+const LS_EXPERT_IDX = 'verdict_expert_idx';
+const LS_MOD_AUTH = 'verdict_mod_auth';
+const LS_NAV_IDX = 'verdict_nav_idx';
+
+const socket = io();
+
+socket.on('connect', ()=>{ document.getElementById('connDot').classList.add('online'); document.getElementById('connLabel').textContent='подключено'; });
+socket.on('disconnect', ()=>{ document.getElementById('connDot').classList.remove('online'); document.getElementById('connLabel').textContent='нет связи…'; });
+
+socket.on('init', (data)=>{
+  config = data.config; participants = data.participants || []; submissions = data.submissions || [];
+  navIdx = clampNavIdx(+(localStorage.getItem(LS_NAV_IDX) || 0));
+  applyConfigEverywhere();
+  routeOnLoad();
+});
+socket.on('config:update', (cfg)=>{ config = cfg; applyConfigEverywhere(); });
+socket.on('participants:update', (list)=>{ participants = list; navIdx = clampNavIdx(navIdx); renderExpertScreenIfActive(); renderModeratorParticipants(); renderResultCards(); });
+socket.on('submissions:update', (list)=>{ submissions = list; refreshAllTables(); renderExpertScreenIfActive(); renderModeratorParticipants(); renderResultCards(); });
+
+function clampNavIdx(i){ if(participants.length===0) return 0; return Math.max(0, Math.min(i, participants.length-1)); }
+
+function applyConfigEverywhere(){
+  document.getElementById('brandTitle').textContent = config.eventName || 'Вердикт';
+  renderTableHead('tableHeadRow');
+  renderTableHead('tableHeadRowE');
+  const idx = localStorage.getItem(LS_EXPERT_IDX);
+  if(idx !== null && config.experts[idx]){
+    document.getElementById('expertYouLabel2').textContent = 'Вы: ' + config.experts[idx];
+  }
+}
+
+// ---------- маршрутизация ----------
+function routeOnLoad(){
+  const role = localStorage.getItem(LS_ROLE);
+  if(role === 'expert'){
+    const idx = localStorage.getItem(LS_EXPERT_IDX);
+    if(idx !== null && config.experts[idx]) enterExpertScreen(+idx);
+    else showExpertPick();
+  } else if(role === 'moderator' && localStorage.getItem(LS_MOD_AUTH) === 'true'){
+    enterModeratorScreen();
+  } else {
+    show('screen-role');
+  }
+}
+function chooseRole(role){
+  if(role === 'expert'){ localStorage.setItem(LS_ROLE, 'expert'); showExpertPick(); }
+  else { show('screen-mod-login'); }
+}
+function showExpertPick(){
+  const grid = document.getElementById('expertPickGrid');
+  grid.innerHTML = config.experts.map((name, i)=>`
+    <div class="expert-pick-card" onclick="pickExpert(${i})"><span class="n">0${i+1}</span><h3>${escapeHtml(name)}</h3></div>`).join('');
+  show('screen-expert-pick');
+}
+function pickExpert(idx){ localStorage.setItem(LS_EXPERT_IDX, idx); enterExpertScreen(idx); }
+function enterExpertScreen(idx){
+  document.getElementById('expertYouLabel2').textContent = 'Вы: ' + (config.experts[idx] || ('Эксперт ' + (idx+1)));
+  document.getElementById('roleSwitchWrap').innerHTML = '';
+  switchExpertTab('form');
+  renderExpertScreenIfActive();
+  show('screen-expert');
+}
+function modLogin(){
+  const pwd = document.getElementById('modPasswordInput').value;
+  socket.emit('moderator:login', pwd, (res)=>{
+    if(res && res.ok){
+      localStorage.setItem(LS_ROLE, 'moderator');
+      localStorage.setItem(LS_MOD_AUTH, 'true');
+      window._modPassword = pwd;
+      document.getElementById('modPasswordInput').value = '';
+      enterModeratorScreen();
+    } else { showToast('Неверный пароль', true); }
+  });
+}
+function enterModeratorScreen(){
+  document.getElementById('roleSwitchWrap').innerHTML = '<button class="btn-ghost-sm" onclick="logoutModerator()">Выйти</button>';
+  document.getElementById('cfgEventName').value = config.eventName;
+  document.getElementById('cfgC0').value = config.criteria[0];
+  document.getElementById('cfgC1').value = config.criteria[1];
+  document.getElementById('cfgC2').value = config.criteria[2];
+  document.getElementById('cfgC3').value = config.criteria[3];
+  editingExperts = [...config.experts];
+  renderExpertFields();
+  renderModeratorParticipants();
+  refreshAllTables();
+  renderResultCards();
+  show('screen-moderator');
+}
+function logoutModerator(){
+  localStorage.removeItem(LS_ROLE); localStorage.removeItem(LS_MOD_AUTH);
+  window._modPassword = null; location.reload();
+}
+function techAccess(){
+  const pwd = prompt('Технический доступ. Введите пароль модератора, чтобы отвязать это устройство:');
+  if(pwd === null) return;
+  socket.emit('moderator:login', pwd, (res)=>{
+    if(res && res.ok){ localStorage.clear(); location.reload(); }
+    else { showToast('Неверный пароль', true); }
+  });
+}
+function show(id){
+  ['screen-role','screen-expert-pick','screen-mod-login','screen-expert','screen-moderator'].forEach(s=>document.getElementById(s).classList.toggle('active', s===id));
+}
+function switchExpertTab(tab){
+  document.getElementById('tabForm').classList.toggle('active', tab==='form');
+  document.getElementById('tabResults').classList.toggle('active', tab==='results');
+  document.getElementById('expertFormView').style.display = tab==='form' ? '' : 'none';
+  document.getElementById('expertResultsView').style.display = tab==='results' ? '' : 'none';
+}
+
+// ---------- настройки ----------
+function renderExpertFields(){
+  const c = document.getElementById('expertsFieldsContainer');
+  c.innerHTML = editingExperts.map((name, i)=>`
+    <div class="expert-edit-row" style="display:flex;gap:8px;margin-bottom:10px;">
+      <input type="text" value="${escapeHtml(name)}" oninput="editingExperts[${i}]=this.value" placeholder="Имя эксперта ${i+1}" style="flex:1;">
+      <button type="button" class="btn-icon" onclick="removeExpertField(${i})" title="Удалить">×</button>
+    </div>`).join('');
+}
+function addExpertField(){ editingExperts.push('Эксперт ' + (editingExperts.length+1)); renderExpertFields(); }
+function removeExpertField(i){
+  if(editingExperts.length <= 1){ showToast('Должен остаться хотя бы один эксперт', true); return; }
+  if(!confirm('Удалить этого эксперта из списка?')) return;
+  editingExperts.splice(i,1); renderExpertFields();
+}
+function saveConfig(){
+  const cfg = {
+    password: window._modPassword || '',
+    eventName: document.getElementById('cfgEventName').value || 'Мероприятие',
+    criteria: [
+      document.getElementById('cfgC0').value || DEFAULT_CRITERIA[0],
+      document.getElementById('cfgC1').value || DEFAULT_CRITERIA[1],
+      document.getElementById('cfgC2').value || DEFAULT_CRITERIA[2],
+      document.getElementById('cfgC3').value || DEFAULT_CRITERIA[3],
+    ],
+    experts: editingExperts.map(e => e.trim()).filter(e => e.length > 0),
+  };
+  if(cfg.experts.length === 0){ showToast('Добавьте хотя бы одного эксперта', true); return; }
+  socket.emit('config:save', cfg, (res)=>{
+    if(res && res.ok){ showToast('Настройки сохранены'); document.getElementById('settingsBlock').open = false; }
+    else { showToast('Не удалось сохранить (пароль?)', true); }
+  });
+}
+
+// ---------- участники: модератор ----------
+function importParticipants(){
+  const fileInput = document.getElementById('importFileInput');
+  if(!fileInput.files.length){ showToast('Выберите файл', true); return; }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('password', window._modPassword || '');
+  showToast('Импортирую…');
+  fetch('/api/import-participants', { method:'POST', body: fd })
+    .then(r=>r.json())
+    .then(res=>{
+      if(res.ok){ showToast('Добавлено участников: ' + res.added); fileInput.value=''; }
+      else { showToast(res.error || 'Ошибка импорта', true); }
+    })
+    .catch(()=> showToast('Ошибка сети при импорте', true));
+}
+function addParticipant(){
+  const name = document.getElementById('newPName').value.trim();
+  const age = document.getElementById('newPAge').value;
+  const eventVal = document.getElementById('newPEvent').value.trim();
+  if(!name){ showToast('Укажите имя участника', true); return; }
+  socket.emit('participants:add', { password: window._modPassword || '', participant: { name, age, event: eventVal } }, (res)=>{
+    if(res && res.ok){
+      showToast('Участник добавлен');
+      document.getElementById('newPName').value = '';
+      document.getElementById('newPAge').value = '';
+      document.getElementById('newPEvent').value = '';
+    } else { showToast((res && res.error) || 'Не удалось добавить', true); }
+  });
+}
+function renderModeratorParticipants(){
+  const tbody = document.getElementById('participantsTableBody');
+  if(!tbody) return;
+  if(participants.length === 0){
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">Список пуст — импортируйте файл или добавьте вручную</td></tr>';
+    return;
+  }
+  tbody.innerHTML = participants.map(p=>{
+    const cnt = submissions.filter(s=>s.participantId===p.id).length;
+    return `<tr>
+      <td>${escapeHtml(p.number)}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${p.age != null ? p.age : '—'}</td>
+      <td>${escapeHtml(p.event || '—')}</td>
+      <td>${cnt}</td>
+      <td><div class="row-actions">
+        <button class="btn-icon" onclick="editParticipant('${p.id}')" title="Редактировать">✎</button>
+        <button class="btn-icon" onclick="removeParticipant('${p.id}')" title="Удалить">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+function editParticipant(id){
+  const p = participants.find(x=>x.id===id);
+  if(!p) return;
+  const name = prompt('Имя участника:', p.name);
+  if(name === null) return;
+  const age = prompt('Возраст:', p.age != null ? p.age : '');
+  if(age === null) return;
+  const eventVal = prompt('Мероприятие / номинация:', p.event || '');
+  if(eventVal === null) return;
+  socket.emit('participants:edit', { password: window._modPassword || '', id, patch: { name, age, event: eventVal } }, (res)=>{
+    if(res && res.ok) showToast('Изменения сохранены');
+    else showToast('Не удалось сохранить', true);
+  });
+}
+function removeParticipant(id){
+  if(!confirm('Удалить участника из списка? Уже полученные по нему оценки останутся в отчётах.')) return;
+  socket.emit('participants:remove', { password: window._modPassword || '', id }, (res)=>{
+    if(res && res.ok) showToast('Участник удалён');
+    else showToast('Не удалось удалить', true);
+  });
+}
+
+// ---------- форма эксперта ----------
+function currentExpertIdx(){ return +localStorage.getItem(LS_EXPERT_IDX); }
+function myScoreFor(participantId){
+  const idx = currentExpertIdx();
+  return submissions.find(s=>s.expertId===idx && s.participantId===participantId);
+}
+function isDirty(){
+  return scores.some(s=>s!==null && s!==undefined) || (document.getElementById('sharedComment')?.value.trim().length>0);
+}
+function renderExpertScreenIfActive(){
+  if(!document.getElementById('screen-expert').classList.contains('active')) return;
+  renderProgress();
+  renderStrip();
+  renderHero();
+  renderCriteria();
+}
+function renderProgress(){
+  const idx = currentExpertIdx();
+  const done = participants.filter(p=> submissions.some(s=>s.expertId===idx && s.participantId===p.id)).length;
+  document.getElementById('progressLabel').textContent = `Оценено ${done} / ${participants.length}`;
+  document.getElementById('progressFill').style.width = participants.length ? (done/participants.length*100)+'%' : '0%';
+}
+function renderStrip(){
+  const idx = currentExpertIdx();
+  const el = document.getElementById('participantStrip');
+  el.innerHTML = participants.map((p,i)=>{
+    const done = submissions.some(s=>s.expertId===idx && s.participantId===p.id);
+    const cls = i===navIdx ? 'current' : (done ? 'done' : '');
+    return `<div class="strip-item ${cls}" onclick="jumpTo(${i})" title="${escapeHtml(p.name)}">${done && i!==navIdx ? '✓' : escapeHtml(p.number)}</div>`;
+  }).join('');
+}
+function renderHero(){
+  const p = participants[navIdx];
+  if(!p){
+    document.getElementById('heroNumber').textContent = '—';
+    document.getElementById('heroName').textContent = 'Нет участников';
+    document.getElementById('heroSub').textContent = 'Модератор ещё не загрузил список';
+    document.getElementById('heroEvent').textContent = '';
+    document.getElementById('heroStatus').textContent = '';
+    document.getElementById('prevBtn').disabled = true;
+    document.getElementById('nextBtn').disabled = true;
+    return;
+  }
+  document.getElementById('heroNumber').textContent = p.number;
+  document.getElementById('heroName').textContent = p.name;
+  document.getElementById('heroSub').textContent = p.age != null ? (p.age + ' лет') : '';
+  document.getElementById('heroEvent').textContent = p.event || '';
+  const already = myScoreFor(p.id);
+  const badge = document.getElementById('heroStatus');
+  badge.textContent = already ? 'ОЦЕНЕНО' : 'ОЖИДАЕТ ОЦЕНКИ';
+  badge.className = 'status-badge ' + (already ? 'status-done' : 'status-waiting');
+  document.getElementById('prevBtn').disabled = navIdx <= 0;
+  document.getElementById('nextBtn').disabled = navIdx >= participants.length - 1;
+}
+function renderCriteria(){
+  const c = document.getElementById('criteriaContainer');
+  const p = participants[navIdx];
+  const already = p ? myScoreFor(p.id) : null;
+  scores = config.criteria.map((_, i)=> already ? already.scores[i].score : null);
+  c.innerHTML = config.criteria.map((name, idx)=>`
+    <div class="criterion-row">
+      <span class="criterion-name">${escapeHtml(name)}</span>
+      <div class="stepper">
+        <button type="button" onclick="stepScore(${idx},-1)">−</button>
+        <span class="val ${scores[idx]===null?'empty':''}" id="stepVal${idx}">${scores[idx]===null?'—':scores[idx]}</span>
+        <button type="button" onclick="stepScore(${idx},1)">+</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('sharedComment').value = already ? (already.comment||'') : '';
+  updateTotalDisplay();
+  renderSubmitState();
+}
+function stepScore(idx, delta){
+  let v = scores[idx];
+  if(v === null || v === undefined) v = delta > 0 ? 1 : 1;
+  else v = Math.max(1, Math.min(10, v + delta));
+  scores[idx] = v;
+  const el = document.getElementById('stepVal'+idx);
+  el.textContent = v; el.classList.remove('empty');
+  updateTotalDisplay();
+  renderSubmitState();
+}
+function updateTotalDisplay(){
+  const max = config.criteria.length * 10;
+  const filled = scores.filter(s=>s!==null && s!==undefined);
+  const sum = filled.reduce((a,b)=>a+b,0);
+  document.getElementById('totalVal').textContent = (filled.length===scores.length ? sum : '—') + ' / ' + max;
+}
+function renderSubmitState(){
+  const allScored = scores.length>0 && scores.every(s=>s!==null && s!==undefined);
+  const commentOk = document.getElementById('sharedComment')?.value.trim().length>0;
+  const hasParticipant = !!participants[navIdx];
+  document.getElementById('submitBtn').disabled = !(allScored && commentOk && hasParticipant);
+}
+function submitScore(){
+  const p = participants[navIdx];
+  if(!p) return;
+  const idx = currentExpertIdx();
+  const expertName = config.experts[idx];
+  const comment = document.getElementById('sharedComment').value.trim();
+  const criteriaData = config.criteria.map((name, i)=>({ criterion: name, score: scores[i] }));
+  socket.emit('submission:add', { expertId: idx, expertName, participantId: p.id, scores: criteriaData, comment });
+  showToast('✓ ОЦЕНКА СОХРАНЕНА');
+  setTimeout(()=>{ if(navIdx < participants.length-1){ navIdx++; persistNavIdx(); renderExpertScreenIfActive(); } }, 250);
+}
+function persistNavIdx(){ localStorage.setItem(LS_NAV_IDX, navIdx); }
+function guardAndGo(targetIdx){
+  if(isDirty() && !myScoreFor(participants[navIdx]?.id)){
+    const ok = confirm('Оценка ещё не сохранена.\nСохранить и перейти дальше?');
+    if(ok){
+      const allScored = scores.length>0 && scores.every(s=>s!==null && s!==undefined);
+      const commentOk = document.getElementById('sharedComment')?.value.trim().length>0;
+      if(allScored && commentOk){ submitScore(); setTimeout(()=>{ navIdx = clampNavIdx(targetIdx); persistNavIdx(); renderExpertScreenIfActive(); }, 300); }
+      else { showToast('Заполните все критерии и комментарий, чтобы сохранить', true); }
+    }
+    return;
+  }
+  navIdx = clampNavIdx(targetIdx); persistNavIdx(); renderExpertScreenIfActive();
+}
+function navPrev(){ guardAndGo(navIdx-1); }
+function navNext(){ guardAndGo(navIdx+1); }
+function jumpTo(i){ guardAndGo(i); }
+
+// ---------- таблицы (общие) ----------
+function renderTableHead(elId){
+  const row = document.getElementById(elId);
+  if(!row) return;
+  let html = '<th>#</th><th>Время</th><th>Эксперт</th><th>№</th><th>Участник</th><th>Возраст</th><th>Мероприятие</th>';
+  config.criteria.forEach(name=>{ html += `<th>${escapeHtml(name)}</th>`; });
+  html += '<th>Итого</th><th>Комментарий</th>';
+  row.innerHTML = html;
+}
+function buildRows(){
+  if(!submissions.length){
+    return `<tr class="empty-row"><td colspan="${9+config.criteria.length}">Пока нет ни одной оценки — ждём экспертов…</td></tr>`;
+  }
+  return submissions.map((s,i)=>{
+    const t = new Date(s.timestamp);
+    const time = t.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    let cells = `<td>${i+1}</td><td>${time}</td><td>${escapeHtml(s.expertName)}</td><td>${escapeHtml(s.participantNumber||'')}</td><td>${escapeHtml(s.target)}</td><td>${s.participantAge!=null?s.participantAge:'—'}</td><td>${escapeHtml(s.targetGroup||'')}</td>`;
+    s.scores.forEach(sc=>{ cells += `<td class="score-cell">${sc.score}</td>`; });
+    cells += `<td class="total-cell">${s.total}</td>`;
+    cells += `<td class="cmt-cell" title="${escapeHtml(s.comment||'')}">${escapeHtml(s.comment||'')}</td>`;
+    return `<tr>${cells}</tr>`;
+  }).join('');
+}
+function refreshAllTables(){
+  const rows = buildRows();
+  const tb = document.getElementById('tableBody'); if(tb) tb.innerHTML = rows;
+  const tbE = document.getElementById('tableBodyE'); if(tbE) tbE.innerHTML = rows;
+  const experts = new Set(submissions.map(s=>s.expertName));
+  ['statCount','statCountE'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent = submissions.length; });
+  ['statExperts','statExpertsE'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent = experts.size; });
+}
+function clearAllData(){
+  if(!confirm('Удалить все полученные оценки? Это необратимо.')) return;
+  socket.emit('data:clear', window._modPassword || '', (res)=>{
+    if(res && res.ok){ showToast('Данные очищены'); }
+    else { showToast('Не удалось очистить (пароль?)', true); }
+  });
+}
+
+// ---------- карточки результатов по участникам + печать ----------
+function renderResultCards(){
+  const el = document.getElementById('resultCardsContainer');
+  if(!el) return;
+  if(participants.length === 0){ el.innerHTML = '<p style="color:var(--text3);">Список участников пуст.</p>'; return; }
+  el.innerHTML = participants.map(p=>{
+    const subs = submissions.filter(s=>s.participantId===p.id);
+    const total = subs.reduce((a,s)=>a+s.total,0);
+    const rowsHtml = subs.map(s=>`<tr><td>${escapeHtml(s.expertName)}</td>${s.scores.map(sc=>`<td>${sc.score}</td>`).join('')}<td><b>${s.total}</b></td></tr>`).join('');
+    return `<div class="result-card">
+      <div class="result-card-head">
+        <h4>№${escapeHtml(p.number)} · ${escapeHtml(p.name)}${p.age!=null?' · '+p.age+' лет':''}</h4>
+        <button class="btn-secondary no-print" onclick="printParticipant('${p.id}')" ${subs.length===0?'disabled':''}>🖨 Печать</button>
+      </div>
+      ${p.event ? `<div style="color:var(--accent);font-size:12.5px;margin-bottom:6px;">${escapeHtml(p.event)}</div>` : ''}
+      ${subs.length===0 ? '<p style="color:var(--text3);font-size:13px;">Оценок пока нет</p>' : `
+      <table class="result-mini-table"><thead><tr><th>Эксперт</th>${config.criteria.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th>Итого</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table>
+      <div style="margin-top:8px;font-weight:700;color:var(--accent);">Сумма: ${total}</div>`}
+    </div>`;
+  }).join('');
+}
+function printParticipant(id){
+  const p = participants.find(x=>x.id===id);
+  if(!p) return;
+  const subs = submissions.filter(s=>s.participantId===id);
+  const total = subs.reduce((a,s)=>a+s.total,0);
+  const rowsHtml = subs.map(s=>`<tr><td>${escapeHtml(s.expertName)}</td>${s.scores.map(sc=>`<td style="text-align:center;">${sc.score}</td>`).join('')}<td style="text-align:center;"><b>${s.total}</b></td></tr>`).join('');
+  const cmtHtml = subs.map(s=>`<tr><td style="font-weight:700;">${escapeHtml(s.expertName)}</td><td>${escapeHtml(s.comment||'')}</td></tr>`).join('');
+  document.getElementById('printSingleContainer').innerHTML = `
+    <h2>${escapeHtml(config.eventName)}</h2>
+    <p><b>УЧАСТНИК №:</b> ${escapeHtml(p.number)} &nbsp; <b>ФИО/НАЗВАНИЕ:</b> ${escapeHtml(p.name)} &nbsp; <b>ВОЗРАСТ:</b> ${p.age!=null?p.age:'—'} &nbsp; <b>МЕРОПРИЯТИЕ:</b> ${escapeHtml(p.event||'—')}</p>
+    <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;margin-bottom:16px;">
+      <thead><tr><th>Член жюри</th>${config.criteria.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th>Итого</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <p><b>СУММА: ${total}</b></p>
+    <h3>Комментарии</h3>
+    <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;">${cmtHtml}</table>
+  `;
+  document.body.classList.add('printing-single');
+  window.print();
+  setTimeout(()=> document.body.classList.remove('printing-single'), 500);
+}
+function printAll(){ window.print(); }
+
+// ---------- utils ----------
+function showToast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.toggle('err', !!isErr); t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+</script>
+</body>
+</html>
