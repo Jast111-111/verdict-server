@@ -98,14 +98,19 @@
   .progress-fill{height:100%;background:linear-gradient(90deg, var(--active), var(--accent));border-radius:4px;transition:width .3s;}
 
   /* ---------- критерии (степпер) ---------- */
-  .criterion-row{background:var(--crit-bg);border:1px solid var(--border-soft);border-radius:14px;padding:16px 18px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;}
+  .criterion-row{background:var(--crit-bg);border:1px solid var(--border-soft);border-radius:14px;padding:16px 18px;margin-bottom:12px;}
+  .criterion-head-row{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px;}
   .criterion-name{font-weight:600;font-size:14.5px;color:var(--text);}
-  .stepper{display:flex;align-items:center;gap:14px;}
-  .stepper button{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--s1);color:var(--text);font-size:19px;cursor:pointer;font-family:'Inter',sans-serif;line-height:1;}
-  .stepper button:hover:not(:disabled){border-color:var(--active);color:var(--accent);}
-  .stepper button:disabled{opacity:.3;cursor:not-allowed;}
-  .stepper .val{width:34px;text-align:center;font-weight:800;font-size:22px;color:var(--active);}
-  .stepper .val.empty{color:var(--text-dis);font-weight:600;font-size:16px;}
+  .criterion-val{font-weight:800;font-size:24px;color:var(--active);min-width:30px;text-align:right;}
+  .slider{width:100%;-webkit-appearance:none;appearance:none;height:8px;border-radius:5px;background:var(--border);outline:none;margin:4px 0 12px;cursor:pointer;}
+  .slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;border-radius:50%;background:var(--active);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:pointer;}
+  .slider::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--active);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:pointer;border:none;}
+  .slider:disabled{opacity:.4;cursor:not-allowed;}
+  .quick-nums{display:flex;gap:6px;flex-wrap:wrap;}
+  .quick-nums button{flex:1;min-width:28px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--s1);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;}
+  .quick-nums button:hover:not(:disabled){border-color:var(--active);color:var(--accent);}
+  .quick-nums button.active{background:var(--active);color:#fff;border-color:var(--active);}
+  .quick-nums button:disabled{opacity:.4;cursor:not-allowed;}
 
   .total-row{display:flex;justify-content:space-between;align-items:center;background:var(--s2);border-radius:14px;padding:18px 20px;margin:18px 0;}
   .total-label{font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);}
@@ -326,7 +331,7 @@
 
         <div class="table-wrap" style="margin-top:18px;background:var(--bg);border-color:var(--border);">
           <table class="participants-table" id="participantsTable">
-            <thead><tr><th>№</th><th>Имя</th><th>Возраст</th><th>Мероприятие</th><th>Оценок</th><th></th></tr></thead>
+            <thead><tr><th>Номер</th><th>Имя</th><th>Конкурсный номер</th><th>Возраст</th><th>Сумма баллов</th><th></th></tr></thead>
             <tbody id="participantsTableBody"></tbody>
           </table>
         </div>
@@ -554,13 +559,13 @@ function renderModeratorParticipants(){
     return;
   }
   tbody.innerHTML = participants.map(p=>{
-    const cnt = submissions.filter(s=>s.participantId===p.id).length;
+    const total = submissions.filter(s=>s.participantId===p.id).reduce((a,s)=>a+s.total,0);
     return `<tr>
       <td>${escapeHtml(p.number)}</td>
       <td>${escapeHtml(p.name)}</td>
-      <td>${p.age != null ? p.age : '—'}</td>
       <td>${escapeHtml(p.event || '—')}</td>
-      <td>${cnt}</td>
+      <td>${p.age != null ? p.age : '—'}</td>
+      <td>${total}</td>
       <td><div class="row-actions">
         <button class="btn-icon" onclick="editParticipant('${p.id}')" title="Редактировать">✎</button>
         <button class="btn-icon" onclick="removeParticipant('${p.id}')" title="Удалить">🗑</button>
@@ -597,7 +602,9 @@ function myScoreFor(participantId){
   return submissions.find(s=>s.expertId===idx && s.participantId===participantId);
 }
 function isDirty(){
-  return scores.some(s=>s!==null && s!==undefined) || (document.getElementById('sharedComment')?.value.trim().length>0);
+  // баллы по умолчанию стоят на 5 (ползунок), поэтому "несохранённым" считаем только
+  // наличие начатого комментария — иначе предупреждение всплывало бы при любом просмотре
+  return (document.getElementById('sharedComment')?.value.trim().length>0);
 }
 function renderExpertScreenIfActive(){
   if(!document.getElementById('screen-expert').classList.contains('active')) return;
@@ -648,15 +655,18 @@ function renderCriteria(){
   const c = document.getElementById('criteriaContainer');
   const p = participants[navIdx];
   const already = p ? myScoreFor(p.id) : null;
-  scores = config.criteria.map((_, i)=> already ? already.scores[i].score : null);
+  scores = config.criteria.map((_, i)=> already ? already.scores[i].score : 5);
   const locked = !!already;
   c.innerHTML = config.criteria.map((name, idx)=>`
     <div class="criterion-row">
-      <span class="criterion-name">${escapeHtml(name)}</span>
-      <div class="stepper">
-        <button type="button" onclick="stepScore(${idx},-1)" ${locked?'disabled':''}>−</button>
-        <span class="val ${scores[idx]===null?'empty':''}" id="stepVal${idx}">${scores[idx]===null?'—':scores[idx]}</span>
-        <button type="button" onclick="stepScore(${idx},1)" ${locked?'disabled':''}>+</button>
+      <div class="criterion-head-row">
+        <span class="criterion-name">${escapeHtml(name)}</span>
+        <span class="criterion-val" id="stepVal${idx}">${scores[idx]}</span>
+      </div>
+      <input type="range" class="slider" min="1" max="10" step="1" value="${scores[idx]}"
+        oninput="setScore(${idx}, +this.value)" ${locked?'disabled':''} id="slider${idx}">
+      <div class="quick-nums" id="quickNums${idx}">
+        ${Array.from({length:10},(_,n)=>n+1).map(n=>`<button type="button" class="${scores[idx]===n?'active':''}" onclick="setScore(${idx},${n})" ${locked?'disabled':''}>${n}</button>`).join('')}
       </div>
     </div>`).join('');
   const commentEl = document.getElementById('sharedComment');
@@ -680,15 +690,16 @@ function renderCriteria(){
   updateTotalDisplay();
   renderSubmitState();
 }
-function stepScore(idx, delta){
+function setScore(idx, v){
   const p = participants[navIdx];
   if(p && myScoreFor(p.id)) return; // уже оценено — менять нельзя
-  let v = scores[idx];
-  if(v === null || v === undefined) v = delta > 0 ? 1 : 1;
-  else v = Math.max(1, Math.min(10, v + delta));
+  v = Math.max(1, Math.min(10, Math.round(v)));
   scores[idx] = v;
-  const el = document.getElementById('stepVal'+idx);
-  el.textContent = v; el.classList.remove('empty');
+  document.getElementById('stepVal'+idx).textContent = v;
+  document.getElementById('slider'+idx).value = v;
+  document.querySelectorAll('#quickNums'+idx+' button').forEach(btn=>{
+    btn.classList.toggle('active', +btn.textContent === v);
+  });
   updateTotalDisplay();
   renderSubmitState();
 }
@@ -785,7 +796,8 @@ function clearAllData(){
   });
 }
 
-// ---------- карточки результатов по участникам + печать ----------
+// ---------- карточки результатов по участникам + печать + редактирование ----------
+const editingSubIds = new Set();
 function renderResultCards(){
   const el = document.getElementById('resultCardsContainer');
   if(!el) return;
@@ -793,7 +805,25 @@ function renderResultCards(){
   el.innerHTML = participants.map(p=>{
     const subs = submissions.filter(s=>s.participantId===p.id);
     const total = subs.reduce((a,s)=>a+s.total,0);
-    const rowsHtml = subs.map(s=>`<tr><td>${escapeHtml(s.expertName)}</td>${s.scores.map(sc=>`<td>${sc.score}</td>`).join('')}<td><b>${s.total}</b></td></tr>`).join('');
+    const rowsHtml = subs.map(s=>{
+      if(editingSubIds.has(s.id)){
+        const scoreInputs = s.scores.map((sc,ci)=>`<td><input type="number" min="1" max="10" value="${sc.score}" id="editScore_${s.id}_${ci}" style="width:52px;padding:4px 6px;"></td>`).join('');
+        return `<tr>
+          <td>${escapeHtml(s.expertName)}</td>${scoreInputs}<td></td>
+        </tr>
+        <tr><td colspan="${s.scores.length+2}" style="padding-top:0;">
+          <textarea id="editComment_${s.id}" style="min-height:60px;margin:6px 0;">${escapeHtml(s.comment||'')}</textarea>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-secondary" onclick="saveSubmissionEdit('${s.id}')">Сохранить</button>
+            <button class="btn-secondary" onclick="cancelSubmissionEdit('${s.id}')">Отмена</button>
+          </div>
+        </td></tr>`;
+      }
+      return `<tr>
+        <td>${escapeHtml(s.expertName)}</td>${s.scores.map(sc=>`<td>${sc.score}</td>`).join('')}<td><b>${s.total}</b></td>
+        <td><button class="btn-icon" onclick="startSubmissionEdit('${s.id}')" title="Исправить оценку/комментарий">✎</button></td>
+      </tr>`;
+    }).join('');
     return `<div class="result-card">
       <div class="result-card-head">
         <h4>№${escapeHtml(p.number)} · ${escapeHtml(p.name)}${p.age!=null?' · '+p.age+' лет':''}</h4>
@@ -801,11 +831,31 @@ function renderResultCards(){
       </div>
       ${p.event ? `<div style="color:var(--accent);font-size:12.5px;margin-bottom:6px;">${escapeHtml(p.event)}</div>` : ''}
       ${subs.length===0 ? '<p style="color:var(--text3);font-size:13px;">Оценок пока нет</p>' : `
-      <table class="result-mini-table"><thead><tr><th>Эксперт</th>${config.criteria.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th>Итого</th></tr></thead>
+      <table class="result-mini-table"><thead><tr><th>Эксперт</th>${config.criteria.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th>Итого</th><th></th></tr></thead>
       <tbody>${rowsHtml}</tbody></table>
       <div style="margin-top:8px;font-weight:700;color:var(--accent);">Сумма: ${total}</div>`}
     </div>`;
   }).join('');
+}
+function startSubmissionEdit(id){ editingSubIds.add(id); renderResultCards(); }
+function cancelSubmissionEdit(id){ editingSubIds.delete(id); renderResultCards(); }
+function saveSubmissionEdit(id){
+  const sub = submissions.find(s=>s.id===id);
+  if(!sub) return;
+  const scores = sub.scores.map((sc,ci)=>{
+    const el = document.getElementById('editScore_'+id+'_'+ci);
+    return { score: Math.max(1, Math.min(10, Math.round(+el.value || 1))) };
+  });
+  const comment = document.getElementById('editComment_'+id).value.trim();
+  if(!comment){ showToast('Комментарий обязателен', true); return; }
+  socket.emit('submission:edit', { password: window._modPassword || '', id, scores, comment }, (res)=>{
+    if(res && res.ok){
+      editingSubIds.delete(id);
+      showToast('Оценка исправлена');
+    } else {
+      showToast((res && res.error) || 'Не удалось сохранить правку', true);
+    }
+  });
 }
 function printParticipant(id){
   const p = participants.find(x=>x.id===id);
