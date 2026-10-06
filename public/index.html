@@ -317,7 +317,7 @@
 
       <div class="panel">
         <h3>Участники</h3>
-        <p class="hint">Импорт из файла: столбцы в порядке <b>Имя, Возраст, Мероприятие/номинация</b> (первая строка — заголовок или сразу данные, определится автоматически). Поддерживаются .xlsx и .docx (таблица в документе).</p>
+        <p class="hint">Импорт из файла: столбцы в порядке <b>Имя, Возраст, Конкурсный номер</b> (первая строка — заголовок или сразу данные, определится автоматически). Поддерживаются .xlsx и .docx (таблица в документе).</p>
         <div class="upload-row">
           <input type="file" id="importFileInput" accept=".xlsx,.xls,.docx">
           <button class="btn-secondary" onclick="importParticipants()">Импортировать из файла</button>
@@ -326,7 +326,7 @@
           <div class="field" style="margin-bottom:0;"><label>Имя</label><input type="text" id="newPName" placeholder="Имя участника"></div>
           <div class="field" style="margin-bottom:0;"><label>Возраст</label><input type="number" id="newPAge" placeholder="14"></div>
         </div>
-        <div class="field" style="margin-top:10px;"><label>Мероприятие / номинация</label><input type="text" id="newPEvent" placeholder="Например: Вокал соло"></div>
+        <div class="field" style="margin-top:10px;"><label>Конкурсный номер</label><input type="text" id="newPEvent" placeholder="Например: Вокал соло"></div>
         <button class="btn-secondary" onclick="addParticipant()" style="margin-top:6px;">+ Добавить участника</button>
 
         <div class="table-wrap" style="margin-top:18px;background:var(--bg);border-color:var(--border);">
@@ -580,7 +580,7 @@ function editParticipant(id){
   if(name === null) return;
   const age = prompt('Возраст:', p.age != null ? p.age : '');
   if(age === null) return;
-  const eventVal = prompt('Мероприятие / номинация:', p.event || '');
+  const eventVal = prompt('Конкурсный номер:', p.event || '');
   if(eventVal === null) return;
   socket.emit('participants:edit', { password: window._modPassword || '', id, patch: { name, age, event: eventVal } }, (res)=>{
     if(res && res.ok) showToast('Изменения сохранены');
@@ -761,7 +761,7 @@ function jumpTo(i){ guardAndGo(i); }
 function renderTableHead(elId){
   const row = document.getElementById(elId);
   if(!row) return;
-  let html = '<th>#</th><th>Время</th><th>Эксперт</th><th>№</th><th>Участник</th><th>Возраст</th><th>Мероприятие</th>';
+  let html = '<th>#</th><th>Время</th><th>Эксперт</th><th>№</th><th>Участник</th><th>Конкурсный номер</th><th>Возраст</th>';
   config.criteria.forEach(name=>{ html += `<th>${escapeHtml(name)}</th>`; });
   html += '<th>Итого</th><th>Комментарий</th>';
   row.innerHTML = html;
@@ -773,7 +773,7 @@ function buildRows(){
   return submissions.map((s,i)=>{
     const t = new Date(s.timestamp);
     const time = t.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-    let cells = `<td>${i+1}</td><td>${time}</td><td>${escapeHtml(s.expertName)}</td><td>${escapeHtml(s.participantNumber||'')}</td><td>${escapeHtml(s.target)}</td><td>${s.participantAge!=null?s.participantAge:'—'}</td><td>${escapeHtml(s.targetGroup||'')}</td>`;
+    let cells = `<td>${i+1}</td><td>${time}</td><td>${escapeHtml(s.expertName)}</td><td>${escapeHtml(s.participantNumber||'')}</td><td>${escapeHtml(s.target)}</td><td>${escapeHtml(s.targetGroup||'')}</td><td>${s.participantAge!=null?s.participantAge:'—'}</td>`;
     s.scores.forEach(sc=>{ cells += `<td class="score-cell">${sc.score}</td>`; });
     cells += `<td class="total-cell">${s.total}</td>`;
     cells += `<td class="cmt-cell" title="${escapeHtml(s.comment||'')}">${escapeHtml(s.comment||'')}</td>`;
