@@ -215,6 +215,7 @@
 
     <section class="screen" id="screen-expert-pick">
       <div class="panel">
+        <button class="btn-ghost-sm no-print" onclick="backToRoleSelect()" style="margin-bottom:16px;">← Назад</button>
         <h3>Кто вы?</h3>
         <p style="color:var(--text2);font-size:13px;margin-top:-8px;">Выбор закрепится за этим устройством.</p>
         <div class="expert-pick-grid" id="expertPickGrid"></div>
@@ -223,6 +224,7 @@
 
     <section class="screen" id="screen-mod-login">
       <div class="lock-center panel">
+        <button class="btn-ghost-sm no-print" onclick="backToRoleSelect()" style="margin-bottom:16px;">← Назад</button>
         <div class="brand-mark" style="margin:0 auto 16px;">V</div>
         <h3>Вход для модератора</h3>
         <p>Введите пароль, выданный организатором.</p>
@@ -423,6 +425,11 @@ function routeOnLoad(){
 function chooseRole(role){
   if(role === 'expert'){ localStorage.setItem(LS_ROLE, 'expert'); showExpertPick(); }
   else { show('screen-mod-login'); }
+}
+function backToRoleSelect(){
+  // пока конкретный эксперт ещё не выбран — устройство ещё ни к чему не привязано, можно вернуться
+  localStorage.removeItem(LS_ROLE);
+  show('screen-role');
 }
 function showExpertPick(){
   const grid = document.getElementById('expertPickGrid');
